@@ -31,19 +31,19 @@ public class LandDao {
         StringBuilder sqlBuilder = new StringBuilder();
         String sql = """
                 SELECT *,
-                ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt,
-                ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng,
-                ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat\s
+                ST_AsText(boundary) as boundary_wkt,
+                ST_X(center_point) as center_lng,
+                ST_Y(center_point) as center_lat\s
                 FROM land WHERE 1=1\s
                """;
         sqlBuilder.append(sql);
 
         List<Object> params = new ArrayList<>();
 
-        // 지도 영역 필터링 (WGS84 좌표를 5186으로 변환하여 비교)
+        // 지도 영역 필터링 (4326 좌표계로 직접 비교)
         if (mapRequest.southWestLat() != null && mapRequest.southWestLng() != null &&
             mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
-            sqlBuilder.append("AND ST_Intersects(boundary, ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 5186)) ");
+            sqlBuilder.append("AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326)) ");
             params.add(mapRequest.southWestLng());
             params.add(mapRequest.southWestLat());
             params.add(mapRequest.northEastLng());
@@ -76,62 +76,6 @@ public class LandDao {
         sqlBuilder.append("ORDER BY id LIMIT 1000");
 
         return jdbcTemplate.query(sqlBuilder.toString(), new LandRowMapper(), params.toArray());
-    }
-
-    /**
-     * 지도 영역 내 토지 중심점 조회 (마커용)
-     */
-    public List<LandWithPoint> findLandPointsInMapBounds(MapSearchRequest mapRequest, LandSearchFilterRequest filterRequest) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id, address, ");
-        sql.append("ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as lng, ");
-        sql.append("ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as lat ");
-        sql.append("FROM land WHERE 1=1 ");
-
-        List<Object> params = new ArrayList<>();
-
-        // 지도 영역 필터링 (WGS84 좌표를 5186으로 변환하여 비교)
-        if (mapRequest.southWestLat() != null && mapRequest.southWestLng() != null &&
-            mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
-            sql.append("AND ST_Intersects(boundary, ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 5186)) ");
-            params.add(mapRequest.southWestLng());
-            params.add(mapRequest.southWestLat());
-            params.add(mapRequest.northEastLng());
-            params.add(mapRequest.northEastLat());
-        }
-
-        // 토지 면적 필터링
-        if (filterRequest.landAreaMin() != null) {
-            sql.append("AND land_area >= ? ");
-            params.add(filterRequest.landAreaMin());
-        }
-        if (filterRequest.landAreaMax() != null) {
-            sql.append("AND land_area <= ? ");
-            params.add(filterRequest.landAreaMax());
-        }
-
-        // 공시지가 필터링
-        if (filterRequest.officialLandPriceMin() != null) {
-            sql.append("AND official_land_price >= ? ");
-            params.add(filterRequest.officialLandPriceMin());
-        }
-        if (filterRequest.officialLandPriceMax() != null) {
-            sql.append("AND official_land_price <= ? ");
-            params.add(filterRequest.officialLandPriceMax());
-        }
-
-        // 지목코드 필터링
-        addLandCategoryFilters(sql, params, filterRequest);
-
-        sql.append("ORDER BY id LIMIT 1000");
-
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) ->
-            new LandWithPoint(
-                rs.getLong("id"),
-                rs.getString("address"),
-                new Point(rs.getDouble("lat"), rs.getDouble("lng"))
-            ), params.toArray()
-        );
     }
 
     /**
@@ -169,26 +113,28 @@ public class LandDao {
     }
 
     /**
-     * 지역별 토지 개수 집계 (줌 레벨이 낮을 때 사용)
+     * 지역별 토지 개수 집계 (줌 레벨에 따른 법정동 코드 기반 필터링)
+     * @param beopjungDongCode 법정동 코드 (null이면 전체)
+     * @param zoomLevel 줌 레벨 (낮을수록 상위 지역 단위로 집계)
+     * @param filterRequest 필터 조건
+     * @return 토지 개수
      */
-    public List<LandGroupCount> countLandsByRegion(MapSearchRequest mapRequest, LandSearchFilterRequest filterRequest) {
+    public long countLandsByRegion(String beopjungDongCode, int zoomLevel, LandSearchFilterRequest filterRequest) {
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT LEFT(beopjung_dong_code, 2) as region_code, ");
-        sql.append("COUNT(*) as land_count, ");
-        sql.append("ST_X(ST_Transform(ST_Centroid(ST_Union(boundary)), 4326)) as center_lng, ");
-        sql.append("ST_Y(ST_Transform(ST_Centroid(ST_Union(boundary)), 4326)) as center_lat ");
-        sql.append("FROM land WHERE 1=1 ");
+        
+        // 줌 레벨에 따른 그룹핑 길이 결정
+        int groupLength = getGroupLengthByZoomLevel(zoomLevel);
+        
+        sql.append("SELECT COUNT(*) FROM land WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
 
-        // 지도 영역 필터링 (WGS84 좌표를 5186으로 변환하여 비교)
-        if (mapRequest.southWestLat() != null && mapRequest.southWestLng() != null &&
-            mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
-            sql.append("AND ST_Intersects(boundary, ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 5186)) ");
-            params.add(mapRequest.southWestLng());
-            params.add(mapRequest.southWestLat());
-            params.add(mapRequest.northEastLng());
-            params.add(mapRequest.northEastLat());
+        // 법정동 코드 필터링 (줌 레벨에 따라 코드를 잘라서 사용)
+        if (beopjungDongCode != null && !beopjungDongCode.isEmpty()) {
+            // 줌 레벨에 따라 입력받은 법정동 코드를 적절한 길이로 자르기
+            String truncatedCode = beopjungDongCode.substring(0, groupLength);
+            sql.append("AND LEFT(full_code, ").append(truncatedCode.length()).append(") = ? ");
+            params.add(truncatedCode);
         }
 
         // 필터 조건들
@@ -212,16 +158,24 @@ public class LandDao {
         // 지목코드 필터링
         addLandCategoryFilters(sql, params, filterRequest);
 
-        sql.append("GROUP BY LEFT(beopjung_dong_code, 2) ");
-        sql.append("ORDER BY land_count DESC ");
+        return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+    }
 
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) ->
-            new LandGroupCount(
-                rs.getString("region_code"),
-                rs.getLong("land_count"),
-                new Point(rs.getDouble("center_lat"), rs.getDouble("center_lng"))
-            ), params.toArray()
-        );
+    /**
+     * 줌 레벨에 따른 그룹핑 길이 결정
+     * @param zoomLevel 줌 레벨
+     * @return 법정동 코드 그룹핑 길이
+     */
+    private int getGroupLengthByZoomLevel(int zoomLevel) {
+        if (zoomLevel <= 8) {
+            return 2; // 시도 단위 (예: 11)
+        } else if (zoomLevel <= 10) {
+            return 5; // 시군구 단위 (예: 11110)
+        } else if (zoomLevel <= 12) {
+            return 8; // 읍면동 단위 (예: 11110101)
+        } else {
+            return 10; // 전체 법정동 코드 (예: 1111010100)
+        }
     }
 
     /**
@@ -234,7 +188,7 @@ public class LandDao {
             land.setId(rs.getLong("id"));
             land.setShapeId(rs.getLong("shape_id"));
             land.setUniqueNo(rs.getString("unique_no"));
-            land.setBeopjungDongCode(rs.getString("beopjung_dong_code"));
+            land.setBeopjungDongCode(rs.getString("full_code"));
             land.setAddress(rs.getString("address"));
             land.setLedgerDivisionCode(rs.getShort("ledger_division_code"));
             land.setLedgerDivisionName(rs.getString("ledger_division_name"));
@@ -268,17 +222,17 @@ public class LandDao {
                 land.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
             }
 
-            // PostGIS Geometry를 Point 리스트로 파싱
+            // PostGIS Geometry를 Point 리스트로 파싱 (이미 4326 좌표계)
             String boundaryWkt = rs.getString("boundary_wkt");
             if (boundaryWkt != null) {
                 land.setBoundary(parsePolygonToPointList(boundaryWkt));
             }
 
-            // 중심점 설정
+            // 중심점 설정 (미리 계산된 center_point 사용)
             double centerLng = rs.getDouble("center_lng");
             double centerLat = rs.getDouble("center_lat");
             if (!rs.wasNull()) {
-                land.setCenterPoint(new Point(centerLng, centerLat));
+                land.setCenterPoint(new Point(centerLat, centerLng));
             }
 
             return land;
@@ -290,10 +244,7 @@ public class LandDao {
      */
     public record LandWithPoint(Long id, String address, Point point) {}
 
-    /**
-     * 지역별 토지 개수 집계 결과를 담는 DTO
-     */
-    public record LandGroupCount(String regionCode, Long count, Point centerPoint) {}
+
 
     /**
      * 지목코드 필터링 조건 추가
