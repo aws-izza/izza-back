@@ -1,8 +1,8 @@
 package com.izza.search.presentation.dto;
 
+import com.izza.search.vo.Point;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.awt.*;
 import java.util.List;
 
 @Schema(description = "폴리곤 데이터 응답")

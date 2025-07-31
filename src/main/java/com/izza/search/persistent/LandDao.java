@@ -95,8 +95,8 @@ public class LandDao {
     /**
      * 토지 폴리곤 데이터 조회 (Point 리스트 형태)
      */
-    public Optional<List<Point>> findPolygonById(Long id) {
-        String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE id = ?";
+    public Optional<List<Point>> findPolygonByUniqueNumber(String id) {
+        String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE unique_no = ?";
         List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
             String wkt = rs.getString("boundary_wkt");
             return GisUtils.parsePolygonToPointList(wkt);
@@ -119,7 +119,7 @@ public class LandDao {
 
         // 줌 레벨에 따른 그룹핑 길이 결정
 
-        sql.append("SELECT COUNT(*) FROM land");
+        sql.append("SELECT COUNT(*) FROM land ");
 
         List<Object> params = new ArrayList<>();
 

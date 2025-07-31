@@ -9,7 +9,6 @@ import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -39,14 +38,18 @@ public class MapSearchController {
         return BaseApiResponse.ok(mapSearchService.getAllLandGroupMarkers(mapSearchRequest, landSearchFilterRequest));
     }
 
-    @GetMapping("/polygon")
-    @Operation(summary = "특정 행정구역, 토지 폴리곤 데이터 조회")
+    @GetMapping("/polygon/{polygonType}/{id}")
+    @Operation(summary = "특정 행정구역, 토지 폴리곤 데이터 조회",
+        description = """
+                특정 행정구역 또는 토지의 폴리곤 데이터를 조회합니다. \n
+                행정구역은 법정동 코드로, 토지는 토지번호로 조회합니다.
+                        """)
     public BaseApiResponse<PolygonDataResponse> getLandPolygon(
-            //type은 group, land
-            @PathParam("polygonType") String polygonType
+            // polygonType: group (행정구역) || land (토지)
+            @PathVariable("polygonType") String polygonType,
+            @PathVariable("id") String id
     ) {
-        List<java.awt.Point> points = List.of();
-        return BaseApiResponse.ok(new PolygonDataResponse(points));
+        return BaseApiResponse.ok(mapSearchService.getPolygonDataById(polygonType, id));
     }
 
     @GetMapping("/land/{landId}")

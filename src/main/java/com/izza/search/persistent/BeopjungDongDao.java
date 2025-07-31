@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-
 @Repository
 public class BeopjungDongDao {
 
@@ -54,15 +53,31 @@ public class BeopjungDongDao {
      * 특정 행정구역 코드로 조회
      */
     public Optional<BeopjungDong> findByFullCode(String fullCode) {
-        String sql = "SELECT *, " +
-                "ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as center_lng, " +
-                "ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as center_lat " +
-                "FROM area_polygon WHERE full_code = ?";
-
+        String sql = """
+                SELECT full_code,
+                       beopjung_dong_name as korean_name,
+                       dong_type as type,
+                       ST_X(center_point) as center_lng,
+                       ST_Y(center_point) as center_lat,
+                       ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt
+                FROM beopjeong_dong
+                WHERE full_code = ?
+                """;
         List<BeopjungDong> results = jdbcTemplate.query(sql, new BeopjungDongRowMapper(), fullCode);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
+    /**
+     * 특정 행정구역 폴리곤 데이터 조회 (Point 리스트 형태)
+     */
+    public Optional<List<Point>> findPolygonByFullCode(String full_code) {
+        String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM beopjeong_dong WHERE full_code = ?";
+        List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
+            String wkt = rs.getString("boundary_wkt");
+            return GisUtils.parsePolygonToPointList(wkt);
+        }, full_code);
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 
     private static class BeopjungDongRowMapper implements RowMapper<BeopjungDong> {
         @Override
