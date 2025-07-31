@@ -27,7 +27,7 @@ public class BeopjungDongDao {
     /**
      * 줌 레벨에 따른 행정구역 코드 패턴으로 조회
      */
-    public List<AreaPolygon> findAreasByZoomLevel(MapSearchQuery mapSearchQuery) {
+    public List<BeopjungDong> findAreasByZoomLevel(MapSearchQuery mapSearchQuery) {
         String sql = """
                 SELECT full_code,
                        beopjung_dong_name as korean_name,
@@ -53,13 +53,13 @@ public class BeopjungDongDao {
     /**
      * 특정 행정구역 코드로 조회
      */
-    public Optional<AreaPolygon> findByFullCode(String fullCode) {
+    public Optional<BeopjungDong> findByFullCode(String fullCode) {
         String sql = "SELECT *, " +
                 "ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as center_lng, " +
                 "ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as center_lat " +
                 "FROM area_polygon WHERE full_code = ?";
 
-        List<AreaPolygon> results = jdbcTemplate.query(sql, new AreaPolygonRowMapper(), fullCode);
+        List<BeopjungDong> results = jdbcTemplate.query(sql, new AreaPolygonRowMapper(), fullCode);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
@@ -134,10 +134,10 @@ public class BeopjungDongDao {
     /**
      * AreaPolygon 엔티티 RowMapper
      */
-    private static class AreaPolygonRowMapper implements RowMapper<AreaPolygon> {
+    private static class AreaPolygonRowMapper implements RowMapper<BeopjungDong> {
         @Override
-        public AreaPolygon mapRow(ResultSet rs, int rowNum) throws SQLException {
-            AreaPolygon areaPolygon = new AreaPolygon();
+        public BeopjungDong mapRow(ResultSet rs, int rowNum) throws SQLException {
+            BeopjungDong areaPolygon = new BeopjungDong();
 
             ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(areaPolygon::setFullCode);
             ResultSetUtils.getStringSafe(rs, "korean_name").ifPresent(areaPolygon::setKoreanName);

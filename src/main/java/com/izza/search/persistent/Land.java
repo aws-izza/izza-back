@@ -15,9 +15,6 @@ import java.util.List;
 @Data
 public class Land {
 
-    // Setter 메서드들
-    // Getter 메서드들
-    // 기본 식별자
     private Long id;
     private Long shapeId;
     private String uniqueNo;

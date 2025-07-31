@@ -1,7 +1,7 @@
 package com.izza.search.service;
 
 import com.izza.search.domain.ZoomLevel;
-import com.izza.search.persistent.AreaPolygon;
+import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
 import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
@@ -18,7 +18,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MapSearchService {
-    private final BeopjungDongDao polygonDao;
+    private final BeopjungDongDao beopjungDongDao;
     private final LandDao landDao;
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
@@ -50,7 +50,7 @@ public class MapSearchService {
         );
         System.out.println(areaQuery);
 
-        List<AreaPolygon> beopjeongDongs = polygonDao.findAreasByZoomLevel(areaQuery);
+        List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(areaQuery);
         System.out.println(beopjeongDongs);
 
         return beopjeongDongs.stream().map(b -> {
