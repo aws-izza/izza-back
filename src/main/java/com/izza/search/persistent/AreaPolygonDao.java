@@ -1,6 +1,6 @@
 package com.izza.search.persistent;
 
-import com.izza.search.domain.ZoomLevel;
+import com.izza.search.presentation.utils.ResultSetUtils;
 import com.izza.search.vo.Point;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static com.izza.search.persistent.GisUtils.parsePolygonToPointList;
 
 @Repository
 public class AreaPolygonDao {
@@ -24,40 +23,18 @@ public class AreaPolygonDao {
     }
 
     /**
-     * 줌 레벨에 따른 행정구역 조회 (토지 개수 포함)
-     *
-     * @param areaSearchQuery   행정구역 검색 요청
-     * @param landFilterRequest 토지 필터 요청
-     * @return 행정구역과 해당 구역 내 토지 개수 목록
-     */
-    public List<AreaPolygonWithLandCount> findAreasWithLandCount(
-            AreaSearchQuery areaSearchQuery,
-            LandFilterRequest landFilterRequest) {
-
-        // 행정구역 조회 (줌 레벨에 따른 코드 패턴으로)
-        List<AreaPolygon> areas = findAreasByZoomLevel(areaSearchQuery);
-
-        // 각 행정구역별 토지 개수 조회
-        List<AreaPolygonWithLandCount> result = new ArrayList<>();
-        for (AreaPolygon area : areas) {
-            long landCount = countLandsByAreaCode(area.getFullCode(), landFilterRequest);
-            result.add(AreaPolygonWithLandCount.of(area, landCount));
-        }
-
-        return result;
-    }
-
-    /**
      * 줌 레벨에 따른 행정구역 코드 패턴으로 조회
      */
     public List<AreaPolygon> findAreasByZoomLevel(AreaSearchQuery areaSearchQuery) {
-        String sql = """ 
-                SELECT *,
-                ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as center_lng,
-                ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as center_lat
-                FROM area_polygon WHERE 1=1 \n
-                AND type = ?
-                AND ST_Intersects(geometry, ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 5179))
+        String sql = """
+                SELECT full_code,
+                       beopjung_dong_name as korean_name,
+                       dong_type as type,
+                       ST_X(center_point) as center_lng,
+                       ST_Y(center_point) as center_lat
+                FROM beopjeong_dong
+                WHERE dong_type = ?
+                AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326))
                 """;
 
         List<Object> params = new ArrayList<>();
@@ -152,26 +129,30 @@ public class AreaPolygonDao {
     /**
      * AreaPolygon 엔티티 RowMapper
      */
+    /**
+     * AreaPolygon 엔티티 RowMapper
+     */
     private static class AreaPolygonRowMapper implements RowMapper<AreaPolygon> {
         @Override
         public AreaPolygon mapRow(ResultSet rs, int rowNum) throws SQLException {
             AreaPolygon areaPolygon = new AreaPolygon();
-            areaPolygon.setFullCode(rs.getString("full_code"));
-            areaPolygon.setKoreanName(rs.getString("korean_name"));
-            areaPolygon.setEnglishName(rs.getString("english_name"));
-            areaPolygon.setType(rs.getString("type"));
 
-            // PostGIS Geometry를 Point 리스트로 파싱
-            String boundaryWkt = rs.getString("boundary_wkt");
-            if (boundaryWkt != null) {
-                areaPolygon.setBoundary(parsePolygonToPointList(boundaryWkt));
+            ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(areaPolygon::setFullCode);
+            ResultSetUtils.getStringSafe(rs, "korean_name").ifPresent(areaPolygon::setKoreanName);
+            ResultSetUtils.getStringSafe(rs, "english_name").ifPresent(areaPolygon::setEnglishName);
+            ResultSetUtils.getStringSafe(rs, "type").ifPresent(areaPolygon::setType);
+
+            String boundaryWkt = ResultSetUtils.getStringSafe(rs, "boundary_wkt").orElse(null);
+            if (boundaryWkt != null && !boundaryWkt.trim().isEmpty()) {
+                areaPolygon.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
+            } else {
+                areaPolygon.setBoundary(new ArrayList<>());
             }
 
-            // 중심점 설정
-            double centerLng = rs.getDouble("center_lng");
-            double centerLat = rs.getDouble("center_lat");
-            if (!rs.wasNull()) {
-                areaPolygon.setCenterPoint(new Point(centerLat, centerLng));
+            Optional<Double> centerLng = ResultSetUtils.getDoubleSafe(rs, "center_lng");
+            Optional<Double> centerLat = ResultSetUtils.getDoubleSafe(rs, "center_lat");
+            if (centerLng.isPresent() && centerLat.isPresent()) {
+                areaPolygon.setCenterPoint(new Point(centerLng.get(), centerLat.get()));
             }
 
             return areaPolygon;

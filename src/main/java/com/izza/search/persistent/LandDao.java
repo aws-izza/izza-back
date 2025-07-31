@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static com.izza.search.persistent.GisUtils.parsePolygonToPointList;
 
 @Repository
 public class LandDao {
@@ -98,7 +97,7 @@ public class LandDao {
         String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE id = ?";
         List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
                 String wkt = rs.getString("boundary_wkt");
-                return parsePolygonToPointList(wkt);
+                return GisUtils.parsePolygonToPointList(wkt);
             }, id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -124,7 +123,7 @@ public class LandDao {
         
         // 줌 레벨에 따른 그룹핑 길이 결정
         int groupLength = getGroupLengthByZoomLevel(zoomLevel);
-        
+
         sql.append("SELECT COUNT(*) FROM land WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
@@ -167,9 +166,9 @@ public class LandDao {
      * @return 법정동 코드 그룹핑 길이
      */
     private int getGroupLengthByZoomLevel(int zoomLevel) {
-        if (zoomLevel <= 8) {
+        if (zoomLevel <= 6) {
             return 2; // 시도 단위 (예: 11)
-        } else if (zoomLevel <= 10) {
+        } else if (zoomLevel <= 9) {
             return 5; // 시군구 단위 (예: 11110)
         } else if (zoomLevel <= 12) {
             return 8; // 읍면동 단위 (예: 11110101)
@@ -225,7 +224,7 @@ public class LandDao {
             // PostGIS Geometry를 Point 리스트로 파싱 (이미 4326 좌표계)
             String boundaryWkt = rs.getString("boundary_wkt");
             if (boundaryWkt != null) {
-                land.setBoundary(parsePolygonToPointList(boundaryWkt));
+                land.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
             }
 
             // 중심점 설정 (미리 계산된 center_point 사용)

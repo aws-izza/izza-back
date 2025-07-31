@@ -14,6 +14,9 @@ java {
     }
 }
 
+val springCloudAwsVersion = "3.4.0"
+
+
 configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())
@@ -35,6 +38,10 @@ dependencies {
 
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
+
+    // AWS
+    implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:${springCloudAwsVersion}"))
+    implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager")
 
     // Utils
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
