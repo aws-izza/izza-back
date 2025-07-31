@@ -16,17 +16,17 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class BeopjungDong {
-    
+
     private String fullCode;
-    
+
     private String koreanName;
-    
+
     private String englishName;
-    
+
     private String type;
-    
+
     private List<Point> boundary;
-    
+
     private Point centerPoint;
 
 
@@ -40,5 +40,10 @@ public class BeopjungDong {
                 ", boundary=" + boundary +
                 ", centerPoint=" + centerPoint +
                 '}';
+    }
+
+    public String getSimpleName() {
+        String[] splitName = koreanName.split(" ");
+        return splitName[splitName.length - 1];
     }
 }

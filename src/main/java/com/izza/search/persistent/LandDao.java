@@ -1,5 +1,6 @@
 package com.izza.search.persistent;
 
+import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
@@ -30,19 +31,19 @@ public class LandDao {
     public List<Land> findLandsInMapBounds(MapSearchRequest mapRequest, LandSearchFilterRequest filterRequest) {
         StringBuilder sqlBuilder = new StringBuilder();
         String sql = """
-                SELECT *,
-                ST_AsText(boundary) as boundary_wkt,
-                ST_X(center_point) as center_lng,
-                ST_Y(center_point) as center_lat\s
-                FROM land WHERE 1=1\s
-               """;
+                 SELECT *,
+                 ST_AsText(boundary) as boundary_wkt,
+                 ST_X(center_point) as center_lng,
+                 ST_Y(center_point) as center_lat\s
+                 FROM land WHERE 1=1\s
+                """;
         sqlBuilder.append(sql);
 
         List<Object> params = new ArrayList<>();
 
         // 지도 영역 필터링 (4326 좌표계로 직접 비교)
         if (mapRequest.southWestLat() != null && mapRequest.southWestLng() != null &&
-            mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
+                mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
             sqlBuilder.append("AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326)) ");
             params.add(mapRequest.southWestLng());
             params.add(mapRequest.southWestLat());
@@ -83,10 +84,10 @@ public class LandDao {
      */
     public Optional<Land> findById(Long id) {
         String sql = "SELECT *, " +
-                    "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
-                    "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
-                    "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
-                    "FROM land WHERE id = ?";
+                "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
+                "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
+                "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
+                "FROM land WHERE id = ?";
         List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -97,9 +98,9 @@ public class LandDao {
     public Optional<List<Point>> findPolygonById(Long id) {
         String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE id = ?";
         List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
-                String wkt = rs.getString("boundary_wkt");
-                return GisUtils.parsePolygonToPointList(wkt);
-            }, id);
+            String wkt = rs.getString("boundary_wkt");
+            return GisUtils.parsePolygonToPointList(wkt);
+        }, id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
@@ -112,57 +113,45 @@ public class LandDao {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
-    /**
-     * 지역별 토지 개수 집계 (줌 레벨에 따른 법정동 코드 기반 필터링)
-     * @param beopjungDongCode 법정동 코드 (null이면 전체)
-     * @param zoomLevel 줌 레벨 (낮을수록 상위 지역 단위로 집계)
-     * @param filterRequest 필터 조건
-     * @return 토지 개수
-     */
-    public long countLandsByRegion(String beopjungDongCode, int zoomLevel, LandSearchFilterRequest filterRequest) {
-        StringBuilder sql = new StringBuilder();
-        
-        // 줌 레벨에 따른 그룹핑 길이 결정
-        int groupLength = getGroupLengthByZoomLevel(zoomLevel);
 
-        sql.append("SELECT COUNT(*) FROM land WHERE 1=1 ");
+    public long countLandsByRegion(CountLandQuery countLandQuery) {
+        StringBuilder sql = new StringBuilder();
+
+        // 줌 레벨에 따른 그룹핑 길이 결정
+
+        sql.append("SELECT COUNT(*) FROM land");
 
         List<Object> params = new ArrayList<>();
 
-        // 법정동 코드 필터링 (줌 레벨에 따라 코드를 잘라서 사용)
-        if (beopjungDongCode != null && !beopjungDongCode.isEmpty()) {
-            // 줌 레벨에 따라 입력받은 법정동 코드를 적절한 길이로 자르기
-            String truncatedCode = beopjungDongCode.substring(0, groupLength);
-            sql.append("AND LEFT(full_code, ").append(truncatedCode.length()).append(") = ? ");
-            params.add(truncatedCode);
-        }
+        int codeLength = countLandQuery.type().getCodeLength();
+        String truncatedCode = countLandQuery.beopjungDongCode().substring(codeLength);
+        sql.append("WHERE LEFT(full_code, ").append(truncatedCode.length()).append(") = ? ");
+        params.add(truncatedCode);
 
-        // 필터 조건들
-        if (filterRequest.landAreaMin() != null) {
+        if (countLandQuery.landAreaMin() != null) {
             sql.append("AND land_area >= ? ");
-            params.add(filterRequest.landAreaMin());
+            params.add(countLandQuery.landAreaMin());
         }
-        if (filterRequest.landAreaMax() != null) {
+        if (countLandQuery.landAreaMax() != null) {
             sql.append("AND land_area <= ? ");
-            params.add(filterRequest.landAreaMax());
+            params.add(countLandQuery.landAreaMax());
         }
-        if (filterRequest.officialLandPriceMin() != null) {
+        if (countLandQuery.officialLandPriceMin() != null) {
             sql.append("AND official_land_price >= ? ");
-            params.add(filterRequest.officialLandPriceMin());
+            params.add(countLandQuery.officialLandPriceMin());
         }
-        if (filterRequest.officialLandPriceMax() != null) {
+        if (countLandQuery.officialLandPriceMax() != null) {
             sql.append("AND official_land_price <= ? ");
-            params.add(filterRequest.officialLandPriceMax());
+            params.add(countLandQuery.officialLandPriceMax());
         }
 
-        // 지목코드 필터링
-        addLandCategoryFilters(sql, params, filterRequest);
 
         return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
     }
 
     /**
      * 줌 레벨에 따른 그룹핑 길이 결정
+     *
      * @param zoomLevel 줌 레벨
      * @return 법정동 코드 그룹핑 길이
      */
@@ -238,7 +227,6 @@ public class LandDao {
             return land;
         }
     }
-
 
 
     /**

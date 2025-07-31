@@ -47,7 +47,7 @@ public class BeopjungDongDao {
         params.add(mapSearchQuery.northEast().lng());
         params.add(mapSearchQuery.northEast().lat());
 
-        return jdbcTemplate.query(sql, new AreaPolygonRowMapper(), params.toArray());
+        return jdbcTemplate.query(sql, new BeopjungDongRowMapper(), params.toArray());
     }
 
     /**
@@ -59,82 +59,12 @@ public class BeopjungDongDao {
                 "ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as center_lat " +
                 "FROM area_polygon WHERE full_code = ?";
 
-        List<BeopjungDong> results = jdbcTemplate.query(sql, new AreaPolygonRowMapper(), fullCode);
+        List<BeopjungDong> results = jdbcTemplate.query(sql, new BeopjungDongRowMapper(), fullCode);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
-    /**
-     * 행정구역 코드에 해당하는 토지 개수 조회 (필터 조건 포함)
-     */
-    public long countLandsByAreaCode(String areaCode, LandFilterRequest filterRequest) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT COUNT(*) FROM land WHERE beopjung_dong_code LIKE ? ");
 
-        List<Object> params = new ArrayList<>();
-        // 행정구역 코드 패턴 매칭을 위한 LIKE 패턴 생성
-        params.add(areaCode + "%");
-
-        // 토지 면적 필터링
-        if (filterRequest.landAreaMin() != null) {
-            sql.append("AND land_area >= ? ");
-            params.add(filterRequest.landAreaMin());
-        }
-        if (filterRequest.landAreaMax() != null) {
-            sql.append("AND land_area <= ? ");
-            params.add(filterRequest.landAreaMax());
-        }
-
-        // 공시지가 필터링
-        if (filterRequest.officialLandPriceMin() != null) {
-            sql.append("AND official_land_price >= ? ");
-            params.add(filterRequest.officialLandPriceMin());
-        }
-        if (filterRequest.officialLandPriceMax() != null) {
-            sql.append("AND official_land_price <= ? ");
-            params.add(filterRequest.officialLandPriceMax());
-        }
-
-        // 지목코드 필터링
-        addLandCategoryFilters(sql, params, filterRequest);
-
-        Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
-        return count != null ? count : 0L;
-    }
-
-
-    /**
-     * 지목코드 필터링 조건 추가 (LandDao와 동일한 로직)
-     */
-    private void addLandCategoryFilters(StringBuilder sql, List<Object> params, LandFilterRequest filterRequest) {
-        // 특정 지목코드 목록 필터링
-        if (filterRequest.landCategoryCodes() != null && !filterRequest.landCategoryCodes().isEmpty()) {
-            sql.append("AND land_category_code IN (");
-            for (int i = 0; i < filterRequest.landCategoryCodes().size(); i++) {
-                if (i > 0) sql.append(", ");
-                sql.append("?");
-                params.add(filterRequest.landCategoryCodes().get(i));
-            }
-            sql.append(") ");
-        }
-
-        // 농업용 토지만 필터링
-        if (Boolean.TRUE.equals(filterRequest.agriculturalOnly())) {
-            sql.append("AND land_category_code IN (1, 2, 3, 4) "); // 전, 답, 과수원, 목장용지
-        }
-
-        // 건축 가능 토지만 필터링
-        if (Boolean.TRUE.equals(filterRequest.buildableOnly())) {
-            sql.append("AND land_category_code IN (8, 9, 10, 12, 13) "); // 대, 공장용지, 학교용지, 주유소용지, 창고용지
-        }
-    }
-
-    /**
-     * AreaPolygon 엔티티 RowMapper
-     */
-    /**
-     * AreaPolygon 엔티티 RowMapper
-     */
-    private static class AreaPolygonRowMapper implements RowMapper<BeopjungDong> {
+    private static class BeopjungDongRowMapper implements RowMapper<BeopjungDong> {
         @Override
         public BeopjungDong mapRow(ResultSet rs, int rowNum) throws SQLException {
             BeopjungDong areaPolygon = new BeopjungDong();

@@ -1,8 +1,10 @@
 package com.izza.search.service;
 
+import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
+import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
@@ -43,19 +45,30 @@ public class MapSearchService {
     private List<LandGroupSearchResponse> getLandGroupSearchResponses(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest
     ) {
-        MapSearchQuery areaQuery = new MapSearchQuery(
+        MapSearchQuery mapSearchQuery = new MapSearchQuery(
                 ZoomLevel.from(mapSearchRequest.zoomLevel()),
                 new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
                 new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat())
         );
-        System.out.println(areaQuery);
 
-        List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(areaQuery);
-        System.out.println(beopjeongDongs);
+        List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
-        return beopjeongDongs.stream().map(b -> {
-                    long count = landDao.countLandsByRegion(b.getFullCode(), mapSearchRequest.zoomLevel(), landSearchFilterRequest);
-                    return new LandGroupSearchResponse(b.getFullCode(), b.getKoreanName(), count, b.getCenterPoint(), "GROUP");
+        return beopjeongDongs.stream().map(beopjungDong -> {
+                    CountLandQuery query = new CountLandQuery(
+                            beopjungDong.getFullCode(),
+                            BeopjungDongType.valueOf(beopjungDong.getType()),
+                            landSearchFilterRequest.landAreaMin(),
+                            landSearchFilterRequest.landAreaMax(),
+                            landSearchFilterRequest.officialLandPriceMin(),
+                            landSearchFilterRequest.officialLandPriceMax()
+                    );
+
+                    long count = landDao.countLandsByRegion(query);
+                    return new LandGroupSearchResponse(
+                            beopjungDong.getFullCode(),
+                            beopjungDong.getSimpleName(),
+                            count,
+                            beopjungDong.getCenterPoint(), "GROUP");
                 })
                 .toList();
     }
