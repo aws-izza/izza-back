@@ -1,7 +1,6 @@
 package com.izza.search.presentation;
 
-import com.izza.search.service.LandSearchService;
-import com.izza.search.vo.Point;
+import com.izza.search.service.MapSearchService;
 import com.izza.search.presentation.dto.BaseApiResponse;
 import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
@@ -24,8 +23,8 @@ import java.util.List;
 @RequestMapping("/api/v1/land-search")
 @RequiredArgsConstructor
 @Tag(name = "토지 검색")
-public class LandSearchController {
-    private final LandSearchService landSearchService;
+public class MapSearchController {
+    private final MapSearchService mapSearchService;
 
     @GetMapping("/points")
     @Operation(summary = "지도상 행정구역 정보 검색 (마커)",
@@ -37,7 +36,7 @@ public class LandSearchController {
             @ModelAttribute MapSearchRequest mapSearchRequest,
             @ModelAttribute LandSearchFilterRequest landSearchFilterRequest
     ) {
-        return BaseApiResponse.ok(landSearchService.getAllLandGroupMarkers(mapSearchRequest, landSearchFilterRequest));
+        return BaseApiResponse.ok(mapSearchService.getAllLandGroupMarkers(mapSearchRequest, landSearchFilterRequest));
     }
 
     @GetMapping("/polygon")

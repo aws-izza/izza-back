@@ -2,8 +2,8 @@ package com.izza.search.service;
 
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.AreaPolygon;
-import com.izza.search.persistent.AreaPolygonDao;
-import com.izza.search.persistent.AreaSearchQuery;
+import com.izza.search.persistent.BeopjungDongDao;
+import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
@@ -17,8 +17,8 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class LandSearchService {
-    private final AreaPolygonDao polygonDao;
+public class MapSearchService {
+    private final BeopjungDongDao polygonDao;
     private final LandDao landDao;
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
@@ -43,7 +43,7 @@ public class LandSearchService {
     private List<LandGroupSearchResponse> getLandGroupSearchResponses(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest
     ) {
-        AreaSearchQuery areaQuery = new AreaSearchQuery(
+        MapSearchQuery areaQuery = new MapSearchQuery(
                 ZoomLevel.from(mapSearchRequest.zoomLevel()),
                 new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
                 new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat())

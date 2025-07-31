@@ -1,6 +1,8 @@
 package com.izza.search.persistent;
 
-import com.izza.search.presentation.utils.ResultSetUtils;
+import com.izza.search.persistent.query.MapSearchQuery;
+import com.izza.search.persistent.utils.GisUtils;
+import com.izza.search.persistent.utils.ResultSetUtils;
 import com.izza.search.vo.Point;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -14,18 +16,18 @@ import java.util.Optional;
 
 
 @Repository
-public class AreaPolygonDao {
+public class BeopjungDongDao {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public AreaPolygonDao(JdbcTemplate jdbcTemplate) {
+    public BeopjungDongDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     /**
      * 줌 레벨에 따른 행정구역 코드 패턴으로 조회
      */
-    public List<AreaPolygon> findAreasByZoomLevel(AreaSearchQuery areaSearchQuery) {
+    public List<AreaPolygon> findAreasByZoomLevel(MapSearchQuery mapSearchQuery) {
         String sql = """
                 SELECT full_code,
                        beopjung_dong_name as korean_name,
@@ -39,11 +41,11 @@ public class AreaPolygonDao {
 
         List<Object> params = new ArrayList<>();
 
-        params.add(areaSearchQuery.zoomLevel().getType());
-        params.add(areaSearchQuery.southWest().lng());
-        params.add(areaSearchQuery.southWest().lat());
-        params.add(areaSearchQuery.northEast().lng());
-        params.add(areaSearchQuery.northEast().lat());
+        params.add(mapSearchQuery.zoomLevel().getType());
+        params.add(mapSearchQuery.southWest().lng());
+        params.add(mapSearchQuery.southWest().lat());
+        params.add(mapSearchQuery.northEast().lng());
+        params.add(mapSearchQuery.northEast().lat());
 
         return jdbcTemplate.query(sql, new AreaPolygonRowMapper(), params.toArray());
     }

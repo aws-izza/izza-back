@@ -1,5 +1,6 @@
 package com.izza.search.persistent;
 
+import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.vo.Point;
@@ -237,11 +238,6 @@ public class LandDao {
             return land;
         }
     }
-
-    /**
-     * 토지와 중심점 정보를 담는 DTO
-     */
-    public record LandWithPoint(Long id, String address, Point point) {}
 
 
 
