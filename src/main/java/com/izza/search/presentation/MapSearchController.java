@@ -9,12 +9,12 @@ import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,23 +39,25 @@ public class MapSearchController {
         return BaseApiResponse.ok(mapSearchService.getAllLandGroupMarkers(mapSearchRequest, landSearchFilterRequest));
     }
 
-    @GetMapping("/polygon")
-    @Operation(summary = "특정 행정구역, 토지 폴리곤 데이터 조회")
+    @GetMapping("/polygon/{id}")
+    @Operation(summary = "특정 행정구역, 토지 폴리곤 데이터 조회",
+        description = """
+                특정 행정구역 또는 토지의 폴리곤 데이터를 조회합니다. \n
+                행정구역은 법정동 코드로, 토지는 토지번호로 조회합니다.
+                        """)
     public BaseApiResponse<PolygonDataResponse> getLandPolygon(
-            //type은 group, land
-            @PathParam("polygonType") String polygonType
+            // polygonType: group (행정구역) || land (토지)
+            @RequestParam("polygonType") String polygonType,
+            @PathVariable("id") String id
     ) {
-        List<java.awt.Point> points = List.of();
-        return BaseApiResponse.ok(new PolygonDataResponse(points));
+        return BaseApiResponse.ok(mapSearchService.getPolygonDataById(polygonType, id));
     }
 
     @GetMapping("/land/{landId}")
     @Operation(summary = "토지 상세 정보 조회")
     public BaseApiResponse<LandDetailResponse> getLandDetails(
-            @PathVariable("landId") Long landId
+            @PathVariable("landId") String landId
     ) {
-        var response = new LandDetailResponse(1L, "서울특별시 금천구 벚꽃로",
-                120.1, 130_000_000L, "일반공업지역");
-        return BaseApiResponse.ok(response);
+        return BaseApiResponse.ok(mapSearchService.getLandDataById(landId));
     }
 }
