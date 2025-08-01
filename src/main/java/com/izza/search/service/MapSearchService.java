@@ -8,6 +8,7 @@ import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
+import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
@@ -76,14 +77,49 @@ public class MapSearchService {
         if (polygonType.equals("group")) { // 토지 폴리곤
             List<Point> areaPolygon = beopjungDongDao.findPolygonByFullCode(id).orElse(List.of());
             return new PolygonDataResponse(areaPolygon);
-        }
-        else if (polygonType.equals("land")) { // 행정구역 폴리곤
+        } else if (polygonType.equals("land")) { // 행정구역 폴리곤
             List<Point> landPolygon = landDao.findPolygonByUniqueNumber(id).orElse(List.of());
             return new PolygonDataResponse(landPolygon);
-        }
-        else { // 에러
+        } else { // 에러
             throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);
         }
 
+    }
+
+    public LandDetailResponse getLandDataById(String landId) {
+        Optional<Land> landOptional = landDao.findById(landId);
+        if (landOptional.isEmpty()) {
+            throw new IllegalArgumentException("Land not found with id: " + landId);
+        }
+
+        Land land = landOptional.get();
+
+        return new LandDetailResponse(
+                land.getUniqueNo(),
+                land.getBeopjungDongCode(),
+                land.getAddress(),
+                land.getLedgerDivisionCode(),
+                land.getLedgerDivisionName(),
+                land.getBaseYear(),
+                land.getBaseMonth(),
+                land.getLandCategoryCode(),
+                land.getLandCategoryName(),
+                land.getLandArea(),
+                land.getUseDistrictCode1(),
+                land.getUseDistrictName1(),
+                land.getUseDistrictCode2(),
+                land.getUseDistrictName2(),
+                land.getLandUseCode(),
+                land.getLandUseName(),
+                land.getTerrainHeightCode(),
+                land.getTerrainHeightName(),
+                land.getTerrainShapeCode(),
+                land.getTerrainShapeName(),
+                land.getRoadSideCode(),
+                land.getRoadSideName(),
+                land.getOfficialLandPrice(),
+                land.getDataStandardDate(),
+                land.getBoundary(),
+                land.getCenterPoint());
     }
 }

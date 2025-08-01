@@ -82,12 +82,12 @@ public class LandDao {
     /**
      * ID로 토지 상세 정보 조회
      */
-    public Optional<Land> findById(Long id) {
+    public Optional<Land> findById(String id) {
         String sql = "SELECT *, " +
                 "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
                 "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
                 "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
-                "FROM land WHERE id = ?";
+                "FROM land WHERE unique_no = ?";
         List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
