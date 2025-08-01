@@ -119,7 +119,7 @@ public class LandDao {
 
         // 줌 레벨에 따른 그룹핑 길이 결정
 
-        sql.append("SELECT COUNT(*) FROM land");
+        sql.append("SELECT COUNT(*) FROM land ");
 
         List<Object> params = new ArrayList<>();
 

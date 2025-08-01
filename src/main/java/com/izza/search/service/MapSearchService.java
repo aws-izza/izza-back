@@ -56,7 +56,7 @@ public class MapSearchService {
         return beopjeongDongs.stream().map(beopjungDong -> {
                     CountLandQuery query = new CountLandQuery(
                             beopjungDong.getFullCode(),
-                            BeopjungDongType.valueOf(beopjungDong.getType()),
+                            BeopjungDongType.valueOf(beopjungDong.getType().trim()),
                             landSearchFilterRequest.landAreaMin(),
                             landSearchFilterRequest.landAreaMax(),
                             landSearchFilterRequest.officialLandPriceMin(),
