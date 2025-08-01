@@ -1,4 +1,4 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.utils;
 
 import com.izza.search.vo.Point;
 import lombok.experimental.UtilityClass;

@@ -1,4 +1,4 @@
-package com.izza.search.persistent;
+package com.izza.search.presentation.dto;
 
 import java.util.List;
 

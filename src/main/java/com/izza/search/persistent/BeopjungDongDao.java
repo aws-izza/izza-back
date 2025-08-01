@@ -1,0 +1,93 @@
+package com.izza.search.persistent;
+
+import com.izza.search.persistent.query.MapSearchQuery;
+import com.izza.search.persistent.utils.GisUtils;
+import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.search.vo.Point;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+
+@Repository
+public class BeopjungDongDao {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public BeopjungDongDao(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /**
+     * 줌 레벨에 따른 행정구역 코드 패턴으로 조회
+     */
+    public List<BeopjungDong> findAreasByZoomLevel(MapSearchQuery mapSearchQuery) {
+        String sql = """
+                SELECT full_code,
+                       beopjung_dong_name as korean_name,
+                       dong_type as type,
+                       ST_X(center_point) as center_lng,
+                       ST_Y(center_point) as center_lat
+                FROM beopjeong_dong
+                WHERE dong_type = ?
+                AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326))
+                """;
+
+        List<Object> params = new ArrayList<>();
+
+        params.add(mapSearchQuery.zoomLevel().getType());
+        params.add(mapSearchQuery.southWest().lng());
+        params.add(mapSearchQuery.southWest().lat());
+        params.add(mapSearchQuery.northEast().lng());
+        params.add(mapSearchQuery.northEast().lat());
+
+        return jdbcTemplate.query(sql, new BeopjungDongRowMapper(), params.toArray());
+    }
+
+    /**
+     * 특정 행정구역 코드로 조회
+     */
+    public Optional<BeopjungDong> findByFullCode(String fullCode) {
+        String sql = "SELECT *, " +
+                "ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as center_lng, " +
+                "ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as center_lat " +
+                "FROM area_polygon WHERE full_code = ?";
+
+        List<BeopjungDong> results = jdbcTemplate.query(sql, new BeopjungDongRowMapper(), fullCode);
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+
+    private static class BeopjungDongRowMapper implements RowMapper<BeopjungDong> {
+        @Override
+        public BeopjungDong mapRow(ResultSet rs, int rowNum) throws SQLException {
+            BeopjungDong areaPolygon = new BeopjungDong();
+
+            ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(areaPolygon::setFullCode);
+            ResultSetUtils.getStringSafe(rs, "korean_name").ifPresent(areaPolygon::setKoreanName);
+            ResultSetUtils.getStringSafe(rs, "english_name").ifPresent(areaPolygon::setEnglishName);
+            ResultSetUtils.getStringSafe(rs, "type").ifPresent(areaPolygon::setType);
+
+            String boundaryWkt = ResultSetUtils.getStringSafe(rs, "boundary_wkt").orElse(null);
+            if (boundaryWkt != null && !boundaryWkt.trim().isEmpty()) {
+                areaPolygon.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
+            } else {
+                areaPolygon.setBoundary(new ArrayList<>());
+            }
+
+            Optional<Double> centerLng = ResultSetUtils.getDoubleSafe(rs, "center_lng");
+            Optional<Double> centerLat = ResultSetUtils.getDoubleSafe(rs, "center_lat");
+            if (centerLng.isPresent() && centerLat.isPresent()) {
+                areaPolygon.setCenterPoint(new Point(centerLng.get(), centerLat.get()));
+            }
+
+            return areaPolygon;
+        }
+    }
+}

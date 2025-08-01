@@ -1,6 +1,6 @@
 package com.izza.search.presentation;
 
-import com.izza.search.vo.Point;
+import com.izza.search.service.MapSearchService;
 import com.izza.search.presentation.dto.BaseApiResponse;
 import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
@@ -10,6 +10,7 @@ import com.izza.search.presentation.dto.PolygonDataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.websocket.server.PathParam;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,8 +21,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/land-search")
+@RequiredArgsConstructor
 @Tag(name = "토지 검색")
-public class LandSearchController {
+public class MapSearchController {
+    private final MapSearchService mapSearchService;
 
     @GetMapping("/points")
     @Operation(summary = "지도상 행정구역 정보 검색 (마커)",
@@ -33,20 +36,7 @@ public class LandSearchController {
             @ModelAttribute MapSearchRequest mapSearchRequest,
             @ModelAttribute LandSearchFilterRequest landSearchFilterRequest
     ) {
-        List<LandGroupSearchResponse> response;
-        if (mapSearchRequest.zoomLevel() < 10) {
-            response = List.of(
-                    new LandGroupSearchResponse(1L, "서울특별시", 12345L, new Point(37.551902938787826, 126.9918052066339), "GROUP"),
-                    new LandGroupSearchResponse(2L, "경기도", 1110223L, new Point(37.551902938787826, 126.9918052066339), "GROUP")
-            );
-        } else {
-            response = List.of(
-                    new LandGroupSearchResponse(1L, "서울특별시 금천구 벚꽃로 105", null, new Point(37.551902938787826, 126.9918052066339), "LAND"),
-                    new LandGroupSearchResponse(1L, "서울특별시 금천구 벚꽃로 104", null, new Point(37.551902938787826, 126.9918052066339), "LAND")
-            );
-        }
-
-        return BaseApiResponse.ok(response);
+        return BaseApiResponse.ok(mapSearchService.getAllLandGroupMarkers(mapSearchRequest, landSearchFilterRequest));
     }
 
     @GetMapping("/polygon")

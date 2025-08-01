@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "토지 그룹 검색 응답")
 public record LandGroupSearchResponse(
         @Schema(description = "그룹 ID", example = "1")
-        Long id,
+        String id,
         
         @Schema(description = "그룹명", example = "강남구 역삼동")
         String name,
