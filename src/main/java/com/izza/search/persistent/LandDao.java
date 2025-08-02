@@ -2,6 +2,7 @@ package com.izza.search.persistent;
 
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
+import com.izza.search.persistent.utils.ResultSetUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.vo.Point;
@@ -14,7 +15,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 
 @Repository
 public class LandDao {
@@ -113,7 +113,6 @@ public class LandDao {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
-
     public long countLandsByRegion(CountLandQuery countLandQuery) {
         StringBuilder sql = new StringBuilder();
 
@@ -145,26 +144,7 @@ public class LandDao {
             params.add(countLandQuery.officialLandPriceMax());
         }
 
-
         return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
-    }
-
-    /**
-     * 줌 레벨에 따른 그룹핑 길이 결정
-     *
-     * @param zoomLevel 줌 레벨
-     * @return 법정동 코드 그룹핑 길이
-     */
-    private int getGroupLengthByZoomLevel(int zoomLevel) {
-        if (zoomLevel <= 6) {
-            return 2; // 시도 단위 (예: 11)
-        } else if (zoomLevel <= 9) {
-            return 5; // 시군구 단위 (예: 11110)
-        } else if (zoomLevel <= 12) {
-            return 8; // 읍면동 단위 (예: 11110101)
-        } else {
-            return 10; // 전체 법정동 코드 (예: 1111010100)
-        }
     }
 
     /**
@@ -174,60 +154,65 @@ public class LandDao {
         @Override
         public Land mapRow(ResultSet rs, int rowNum) throws SQLException {
             Land land = new Land();
-            land.setId(rs.getLong("id"));
-            land.setShapeId(rs.getLong("shape_id"));
-            land.setUniqueNo(rs.getString("unique_no"));
-            land.setBeopjungDongCode(rs.getString("full_code"));
-            land.setAddress(rs.getString("address"));
-            land.setLedgerDivisionCode(rs.getShort("ledger_division_code"));
-            land.setLedgerDivisionName(rs.getString("ledger_division_name"));
-            land.setBaseYear(rs.getShort("base_year"));
-            land.setBaseMonth(rs.getShort("base_month"));
-            land.setLandCategoryCode(rs.getShort("land_category_code"));
-            land.setLandCategoryName(rs.getString("land_category_name"));
-            land.setLandArea(rs.getBigDecimal("land_area"));
-            land.setUseDistrictCode1(rs.getShort("use_district_code1"));
-            land.setUseDistrictName1(rs.getString("use_district_name1"));
-            land.setUseDistrictCode2(rs.getShort("use_district_code2"));
-            land.setUseDistrictName2(rs.getString("use_district_name2"));
-            land.setLandUseCode(rs.getShort("land_use_code"));
-            land.setLandUseName(rs.getString("land_use_name"));
-            land.setTerrainHeightCode(rs.getShort("terrain_height_code"));
-            land.setTerrainHeightName(rs.getString("terrain_height_name"));
-            land.setTerrainShapeCode(rs.getShort("terrain_shape_code"));
-            land.setTerrainShapeName(rs.getString("terrain_shape_name"));
-            land.setRoadSideCode(rs.getShort("road_side_code"));
-            land.setRoadSideName(rs.getString("road_side_name"));
-            land.setOfficialLandPrice(rs.getBigDecimal("official_land_price"));
+
+            // 기본 필드들을 ResultSetUtils를 사용하여 안전하게 설정
+            ResultSetUtils.getLongSafe(rs, "id").ifPresent(land::setId);
+            ResultSetUtils.getLongSafe(rs, "shape_id").ifPresent(land::setShapeId);
+            ResultSetUtils.getStringSafe(rs, "unique_no").ifPresent(land::setUniqueNo);
+            ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(land::setBeopjungDongCode);
+            ResultSetUtils.getStringSafe(rs, "address").ifPresent(land::setAddress);
+
+            ResultSetUtils.getShortSafe(rs, "ledger_division_code").ifPresent(land::setLedgerDivisionCode);
+            ResultSetUtils.getStringSafe(rs, "ledger_division_name").ifPresent(land::setLedgerDivisionName);
+            ResultSetUtils.getShortSafe(rs, "base_year").ifPresent(land::setBaseYear);
+            ResultSetUtils.getShortSafe(rs, "base_month").ifPresent(land::setBaseMonth);
+
+            ResultSetUtils.getShortSafe(rs, "land_category_code").ifPresent(land::setLandCategoryCode);
+            ResultSetUtils.getStringSafe(rs, "land_category_name").ifPresent(land::setLandCategoryName);
+            ResultSetUtils.getBigDecimalSafe(rs, "land_area").ifPresent(land::setLandArea);
+
+            ResultSetUtils.getShortSafe(rs, "use_district_code1").ifPresent(land::setUseDistrictCode1);
+            ResultSetUtils.getStringSafe(rs, "use_district_name1").ifPresent(land::setUseDistrictName1);
+            ResultSetUtils.getShortSafe(rs, "use_district_code2").ifPresent(land::setUseDistrictCode2);
+            ResultSetUtils.getStringSafe(rs, "use_district_name2").ifPresent(land::setUseDistrictName2);
+
+            ResultSetUtils.getShortSafe(rs, "land_use_code").ifPresent(land::setLandUseCode);
+            ResultSetUtils.getStringSafe(rs, "land_use_name").ifPresent(land::setLandUseName);
+            ResultSetUtils.getShortSafe(rs, "terrain_height_code").ifPresent(land::setTerrainHeightCode);
+            ResultSetUtils.getStringSafe(rs, "terrain_height_name").ifPresent(land::setTerrainHeightName);
+            ResultSetUtils.getShortSafe(rs, "terrain_shape_code").ifPresent(land::setTerrainShapeCode);
+            ResultSetUtils.getStringSafe(rs, "terrain_shape_name").ifPresent(land::setTerrainShapeName);
+            ResultSetUtils.getShortSafe(rs, "road_side_code").ifPresent(land::setRoadSideCode);
+            ResultSetUtils.getStringSafe(rs, "road_side_name").ifPresent(land::setRoadSideName);
+
+            ResultSetUtils.getBigDecimalSafe(rs, "official_land_price").ifPresent(land::setOfficialLandPrice);
 
             // Timestamp를 LocalDateTime으로 변환
-            if (rs.getTimestamp("data_standard_date") != null) {
-                land.setDataStandardDate(rs.getTimestamp("data_standard_date").toLocalDateTime());
-            }
-            if (rs.getTimestamp("created_at") != null) {
-                land.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-            }
-            if (rs.getTimestamp("updated_at") != null) {
-                land.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
-            }
+            ResultSetUtils.getTimestampSafe(rs, "data_standard_date")
+                    .ifPresent(timestamp -> land.setDataStandardDate(timestamp.toLocalDateTime()));
+            ResultSetUtils.getTimestampSafe(rs, "created_at")
+                    .ifPresent(timestamp -> land.setCreatedAt(timestamp.toLocalDateTime()));
+            ResultSetUtils.getTimestampSafe(rs, "updated_at")
+                    .ifPresent(timestamp -> land.setUpdatedAt(timestamp.toLocalDateTime()));
 
             // PostGIS Geometry를 Point 리스트로 파싱 (이미 4326 좌표계)
-            String boundaryWkt = rs.getString("boundary_wkt");
-            if (boundaryWkt != null) {
+            String boundaryWkt = ResultSetUtils.getStringSafe(rs, "boundary_wkt").orElse(null);
+            if (boundaryWkt != null && !boundaryWkt.trim().isEmpty()) {
                 land.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
+            } else {
+                land.setBoundary(new ArrayList<>());
             }
 
             // 중심점 설정 (미리 계산된 center_point 사용)
-            double centerLng = rs.getDouble("center_lng");
-            double centerLat = rs.getDouble("center_lat");
-            if (!rs.wasNull()) {
-                land.setCenterPoint(new Point(centerLat, centerLng));
+            Optional<Double> centerLng = ResultSetUtils.getDoubleSafe(rs, "center_lng");
+            Optional<Double> centerLat = ResultSetUtils.getDoubleSafe(rs, "center_lat");
+            if (centerLng.isPresent() && centerLat.isPresent()) {
+                land.setCenterPoint(new Point(centerLat.get(), centerLng.get()));
             }
 
             return land;
         }
     }
-
 
     /**
      * 지목코드 필터링 조건 추가
@@ -237,7 +222,8 @@ public class LandDao {
         if (filterRequest.landCategoryCodes() != null && !filterRequest.landCategoryCodes().isEmpty()) {
             sql.append("AND land_category_code IN (");
             for (int i = 0; i < filterRequest.landCategoryCodes().size(); i++) {
-                if (i > 0) sql.append(", ");
+                if (i > 0)
+                    sql.append(", ");
                 sql.append("?");
                 params.add(filterRequest.landCategoryCodes().get(i));
             }

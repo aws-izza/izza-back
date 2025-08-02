@@ -33,4 +33,58 @@ public class ResultSetUtils {
             return Optional.empty();
         }
     }
+
+    /**
+     * long 타입 값을 안전하게 가져옴 (null 가능)
+     */
+    public static Optional<Long> getLongSafe(ResultSet rs, String columnName) {
+        try {
+            long value = rs.getLong(columnName);
+            if (rs.wasNull()) {
+                return Optional.empty();
+            }
+            return Optional.of(value);
+        } catch (SQLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * short 타입 값을 안전하게 가져옴 (null 가능)
+     */
+    public static Optional<Short> getShortSafe(ResultSet rs, String columnName) {
+        try {
+            short value = rs.getShort(columnName);
+            if (rs.wasNull()) {
+                return Optional.empty();
+            }
+            return Optional.of(value);
+        } catch (SQLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * BigDecimal 타입 값을 안전하게 가져옴 (null 가능)
+     */
+    public static Optional<java.math.BigDecimal> getBigDecimalSafe(ResultSet rs, String columnName) {
+        try {
+            java.math.BigDecimal value = rs.getBigDecimal(columnName);
+            return Optional.ofNullable(value);
+        } catch (SQLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Timestamp 타입 값을 안전하게 가져옴 (null 가능)
+     */
+    public static Optional<java.sql.Timestamp> getTimestampSafe(ResultSet rs, String columnName) {
+        try {
+            java.sql.Timestamp value = rs.getTimestamp(columnName);
+            return Optional.ofNullable(value);
+        } catch (SQLException e) {
+            return Optional.empty();
+        }
+    }
 }
