@@ -34,17 +34,19 @@ public class BeopjungDongDao {
                        ST_X(center_point) as center_lng,
                        ST_Y(center_point) as center_lat
                 FROM beopjeong_dong
-                WHERE dong_type = ?
-                AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326))
+                WHERE ST_Contains(ST_MakeEnvelope(?, ?, ?, ?, 4326), center_point) 
+                AND dong_type = ?
                 """;
 
         List<Object> params = new ArrayList<>();
 
-        params.add(mapSearchQuery.zoomLevel().getType());
         params.add(mapSearchQuery.southWest().lng());
         params.add(mapSearchQuery.southWest().lat());
         params.add(mapSearchQuery.northEast().lng());
         params.add(mapSearchQuery.northEast().lat());
+        params.add(mapSearchQuery.zoomLevel().getType());
+        System.out.println(sql);
+        System.out.println(mapSearchQuery);
 
         return jdbcTemplate.query(sql, new BeopjungDongRowMapper(), params.toArray());
     }
@@ -64,6 +66,7 @@ public class BeopjungDongDao {
                 WHERE full_code = ?
                 """;
         List<BeopjungDong> results = jdbcTemplate.query(sql, new BeopjungDongRowMapper(), fullCode);
+
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
@@ -71,10 +74,11 @@ public class BeopjungDongDao {
      * 특정 행정구역 폴리곤 데이터 조회 (Point 리스트 형태)
      */
     public Optional<List<Point>> findPolygonByFullCode(String full_code) {
-        String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM beopjeong_dong WHERE full_code = ?";
+        String sql = "SELECT ST_AsText(boundary) as boundary_wkt FROM beopjeong_dong WHERE full_code = ?";
         List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
             String wkt = rs.getString("boundary_wkt");
-            return GisUtils.parsePolygonToPointList(wkt);
+            List<Point> points = GisUtils.parsePolygonToPointList(wkt);
+            return points;
         }, full_code);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }

@@ -1,47 +1,52 @@
 package com.izza.search.persistent.utils;
 
+
 import com.izza.search.vo.Point;
 import lombok.experimental.UtilityClass;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @UtilityClass
 public class GisUtils {
-    /**
-     * WKT POLYGON을 PointDto 리스트로 파싱
-     * 예: "POLYGON((lng1 lat1,lng2 lat2,lng3 lat3,lng1 lat1))" -> List<PointDto>
-     */
+    private static final GeometryFactory geometryFactory = new GeometryFactory();
+
+    // TODO: multipolygon일 경우를 고려해서 List<List<Point>> 형태로 반환해야함.
     public List<Point> parsePolygonToPointList(String wkt) {
         List<Point> points = new ArrayList<>();
-
-        if (wkt == null || !wkt.startsWith("POLYGON")) {
-            return points;
+        WKTReader reader = new WKTReader(geometryFactory);
+        Geometry geometry = null;
+        try {
+            geometry = reader.read(wkt);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
         }
 
-        // POLYGON((lng1 lat1,lng2 lat2,...)) 형태에서 좌표 부분 추출
-        Pattern pattern = Pattern.compile("POLYGON\\(\\(([^)]+)\\)\\)");
-        Matcher matcher = pattern.matcher(wkt);
-
-        if (matcher.find()) {
-            String coordinatesStr = matcher.group(1);
-            String[] coordinatePairs = coordinatesStr.split(",");
-
-            for (String pair : coordinatePairs) {
-                String[] coords = pair.trim().split("\\s+");
-                if (coords.length >= 2) {
-                    try {
-                        double lng = Double.parseDouble(coords[0]);
-                        double lat = Double.parseDouble(coords[1]);
-                        points.add(new Point(lng, lat));
-                    } catch (NumberFormatException e) {
-                        // 파싱 실패한 좌표는 무시
-                        continue;
-                    }
+        if (geometry instanceof Polygon) {
+            Polygon polygon = (Polygon) geometry;
+            Coordinate[] coords = polygon.getExteriorRing().getCoordinates();
+            for (Coordinate coord : coords) {
+                points.add(new Point(coord.x, coord.y));
+            }
+        } else if (geometry instanceof MultiPolygon) {
+            MultiPolygon multiPolygon = (MultiPolygon) geometry;
+            int numGeometries = multiPolygon.getNumGeometries();
+            for (int i = 0; i < numGeometries; i++) {
+                Polygon polygon = (Polygon) multiPolygon.getGeometryN(i);
+                Coordinate[] coords = polygon.getExteriorRing().getCoordinates();
+                for (Coordinate coord : coords) {
+                    points.add(new Point(coord.x, coord.y));
                 }
             }
+        } else {
+            throw new IllegalArgumentException("Unsupported geometry type: " + geometry.getGeometryType());
         }
 
         return points;

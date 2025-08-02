@@ -14,6 +14,8 @@ import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
 import com.izza.search.vo.Point;
+import com.izza.search.vo.UseZoneCode;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,21 +30,26 @@ public class MapSearchService {
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
-        if (mapSearchRequest.zoomLevel() < 10) {
-            return getLandGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
+        ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
+        if(zoomLevel.equals(ZoomLevel.LAND)) {
+            return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
         } else {
-            List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
-
-            return lands.stream().map(land -> new LandGroupSearchResponse(
-                    land.getUniqueNo().toString(),
-                    land.getAddress(),
-                    null,
-                    land.getCenterPoint(),
-                    "LAND")).toList();
+            return getGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
         }
     }
 
-    private List<LandGroupSearchResponse> getLandGroupSearchResponses(
+    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+        List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
+
+        return lands.stream().map(land -> new LandGroupSearchResponse(
+                land.getUniqueNo(),
+                land.getAddress(),
+                null,
+                land.getCenterPoint(),
+                "LAND")).toList();
+    }
+
+    private List<LandGroupSearchResponse> getGroupSearchResponses(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
         MapSearchQuery mapSearchQuery = new MapSearchQuery(
                 ZoomLevel.from(mapSearchRequest.zoomLevel()),
@@ -52,13 +59,18 @@ public class MapSearchService {
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
         return beopjeongDongs.stream().map(beopjungDong -> {
+            // String -> UseZoneCategory -> UseZoneCode.code 로 변환
+            List<Integer> useZoneIds = UseZoneCode
+                    .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+
             CountLandQuery query = new CountLandQuery(
                     beopjungDong.getFullCode(),
                     BeopjungDongType.valueOf(beopjungDong.getType().trim()),
                     landSearchFilterRequest.landAreaMin(),
                     landSearchFilterRequest.landAreaMax(),
                     landSearchFilterRequest.officialLandPriceMin(),
-                    landSearchFilterRequest.officialLandPriceMax());
+                    landSearchFilterRequest.officialLandPriceMax(),
+                    useZoneIds);
 
             long count = landDao.countLandsByRegion(query);
             return new LandGroupSearchResponse(

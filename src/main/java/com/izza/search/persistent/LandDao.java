@@ -4,8 +4,10 @@ import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.persistent.utils.ResultSetUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
+import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.vo.Point;
+import com.izza.search.vo.UseZoneCode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -51,7 +53,7 @@ public class LandDao {
             params.add(mapRequest.northEastLat());
         }
 
-        // 토지 면적 필터링
+        // 토지 면적 필터링 (Long 타입으로 변경)
         if (filterRequest.landAreaMin() != null) {
             sqlBuilder.append("AND land_area >= ? ");
             params.add(filterRequest.landAreaMin());
@@ -61,7 +63,7 @@ public class LandDao {
             params.add(filterRequest.landAreaMax());
         }
 
-        // 공시지가 필터링
+        // 공시지가 필터링 (Long 타입으로 변경)
         if (filterRequest.officialLandPriceMin() != null) {
             sqlBuilder.append("AND official_land_price >= ? ");
             params.add(filterRequest.officialLandPriceMin());
@@ -71,8 +73,8 @@ public class LandDao {
             params.add(filterRequest.officialLandPriceMax());
         }
 
-        // 지목코드 필터링
-        addLandCategoryFilters(sqlBuilder, params, filterRequest);
+        // 용도지역 카테고리 필터링
+        addUseZoneCategoryFilters(sqlBuilder, params, filterRequest);
 
         sqlBuilder.append("ORDER BY id LIMIT 1000");
 
@@ -115,16 +117,13 @@ public class LandDao {
 
     public long countLandsByRegion(CountLandQuery countLandQuery) {
         StringBuilder sql = new StringBuilder();
-
-        // 줌 레벨에 따른 그룹핑 길이 결정
-
         sql.append("SELECT COUNT(*) FROM land ");
 
         List<Object> params = new ArrayList<>();
 
         int codeLength = countLandQuery.type().getCodeLength();
-        String truncatedCode = countLandQuery.beopjungDongCode().substring(codeLength);
-        sql.append("WHERE LEFT(full_code, ").append(truncatedCode.length()).append(") = ? ");
+        String truncatedCode = countLandQuery.beopjungDongCode().substring(0, codeLength);
+        sql.append("WHERE LEFT(full_code, ").append(codeLength).append(") = ? ");
         params.add(truncatedCode);
 
         if (countLandQuery.landAreaMin() != null) {
@@ -144,7 +143,44 @@ public class LandDao {
             params.add(countLandQuery.officialLandPriceMax());
         }
 
+        // 용도지역 코드 필터링 (실제 UseZoneCode 값 사용)
+        if (countLandQuery.useZoneIds() != null && !countLandQuery.useZoneIds().isEmpty()) {
+            sql.append("AND use_district_code1 IN (");
+            for (int i = 0; i < countLandQuery.useZoneIds().size(); i++) {
+                if (i > 0) {
+                    sql.append(", ");
+                }
+                sql.append("?");
+                params.add(countLandQuery.useZoneIds().get(i));
+            }
+            sql.append(") ");
+        }
+
         return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+    }
+
+    /**
+     * 토지 면적의 최소값과 최대값 조회 (소수점 올림 처리)
+     */
+    public LongRangeDto getLandAreaRange() {
+        String sql = "SELECT MIN(CEIL(land_area)) as min_area, MAX(CEIL(land_area)) as max_area FROM land WHERE land_area IS NOT NULL";
+        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+            long min = rs.getLong("min_area");
+            long max = rs.getLong("max_area");
+            return new LongRangeDto(min, max);
+        });
+    }
+
+    /**
+     * 공시지가의 최소값과 최대값 조회
+     */
+    public LongRangeDto getOfficialLandPriceRange() {
+        String sql = "SELECT MIN(official_land_price) as min_price, MAX(official_land_price) as max_price FROM land WHERE official_land_price IS NOT NULL";
+        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+            long min = rs.getLong("min_price");
+            long max = rs.getLong("max_price");
+            return new LongRangeDto(min, max);
+        });
     }
 
     /**
@@ -207,7 +243,7 @@ public class LandDao {
             Optional<Double> centerLng = ResultSetUtils.getDoubleSafe(rs, "center_lng");
             Optional<Double> centerLat = ResultSetUtils.getDoubleSafe(rs, "center_lat");
             if (centerLng.isPresent() && centerLat.isPresent()) {
-                land.setCenterPoint(new Point(centerLat.get(), centerLng.get()));
+                land.setCenterPoint(new Point(centerLng.get(), centerLat.get()));
             }
 
             return land;
@@ -215,29 +251,25 @@ public class LandDao {
     }
 
     /**
-     * 지목코드 필터링 조건 추가
+     * 용도지역 카테고리 필터링 조건 추가
      */
-    private void addLandCategoryFilters(StringBuilder sql, List<Object> params, LandSearchFilterRequest filterRequest) {
-        // 특정 지목코드 목록 필터링
-        if (filterRequest.landCategoryCodes() != null && !filterRequest.landCategoryCodes().isEmpty()) {
-            sql.append("AND land_category_code IN (");
-            for (int i = 0; i < filterRequest.landCategoryCodes().size(); i++) {
-                if (i > 0)
-                    sql.append(", ");
-                sql.append("?");
-                params.add(filterRequest.landCategoryCodes().get(i));
+    private void addUseZoneCategoryFilters(StringBuilder sql, List<Object> params,
+            LandSearchFilterRequest filterRequest) {
+        if (filterRequest.useZoneCategories() != null && !filterRequest.useZoneCategories().isEmpty()) {
+            // 카테고리 이름들을 실제 UseZoneCode 값들로 변환
+            List<Integer> useZoneCodes = UseZoneCode.convertCategoryNamesToZoneCodes(filterRequest.useZoneCategories());
+            
+            if (useZoneCodes != null && !useZoneCodes.isEmpty()) {
+                sql.append("AND use_district_code1 IN (");
+                for (int i = 0; i < useZoneCodes.size(); i++) {
+                    if (i > 0) {
+                        sql.append(", ");
+                    }
+                    sql.append("?");
+                    params.add(useZoneCodes.get(i));
+                }
+                sql.append(") ");
             }
-            sql.append(") ");
-        }
-
-        // 농업용 토지만 필터링
-        if (Boolean.TRUE.equals(filterRequest.agriculturalOnly())) {
-            sql.append("AND land_category_code IN (1, 2, 3, 4) "); // 전, 답, 과수원, 목장용지
-        }
-
-        // 건축 가능 토지만 필터링
-        if (Boolean.TRUE.equals(filterRequest.buildableOnly())) {
-            sql.append("AND land_category_code IN (8, 9, 10, 12, 13) "); // 대, 공장용지, 학교용지, 주유소용지, 창고용지
         }
     }
 }
