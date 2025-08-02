@@ -74,10 +74,10 @@ public class MapSearchService {
             String polygonType,
             String id) {
 
-        if (polygonType.equals("group")) { // 토지 폴리곤
+        if (polygonType.equals("GROUP")) { // 토지 폴리곤
             List<Point> areaPolygon = beopjungDongDao.findPolygonByFullCode(id).orElse(List.of());
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("land")) { // 행정구역 폴리곤
+        } else if (polygonType.equals("LAND")) { // 행정구역 폴리곤
             List<Point> landPolygon = landDao.findPolygonByUniqueNumber(id).orElse(List.of());
             return new PolygonDataResponse(landPolygon);
         } else { // 에러
