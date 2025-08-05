@@ -4,16 +4,26 @@ import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
+import com.izza.search.persistent.ElectricityCost;
+import com.izza.search.persistent.ElectricityCostDao;
+import com.izza.search.persistent.EmergencyText;
+import com.izza.search.persistent.EmergencyTextDao;
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
+import com.izza.search.persistent.Population;
+import com.izza.search.persistent.PopulationDao;
+import com.izza.search.presentation.dto.AreaDetailResponse;
 import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
+import com.izza.search.vo.ElectricityCostInfo;
+import com.izza.search.vo.EmergencyTextInfo;
 import com.izza.search.vo.Point;
+import com.izza.search.vo.PopulationInfo;
 import com.izza.search.vo.UseZoneCode;
 
 import lombok.RequiredArgsConstructor;
@@ -27,18 +37,22 @@ import java.util.Optional;
 public class MapSearchService {
     private final BeopjungDongDao beopjungDongDao;
     private final LandDao landDao;
+    private final ElectricityCostDao electricityCostDao;
+    private final EmergencyTextDao emergencyTextDao;
+    private final PopulationDao populationDao;
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
         ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
-        if(zoomLevel.equals(ZoomLevel.LAND)) {
+        if (zoomLevel.equals(ZoomLevel.LAND)) {
             return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
         } else {
             return getGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
         }
     }
 
-    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
+            LandSearchFilterRequest landSearchFilterRequest) {
         List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
 
         return lands.stream().map(land -> new LandGroupSearchResponse(
@@ -133,5 +147,43 @@ public class MapSearchService {
                 land.getDataStandardDate(),
                 land.getBoundary(),
                 land.getCenterPoint());
+    }
+
+    public AreaDetailResponse getAreaDetails(
+            String landId) {
+        // first fetch the land of the land from landId
+        Optional<Land> landOptional = landDao.findByFullCode(landId);
+        if (landOptional.isEmpty()) {
+            throw new IllegalArgumentException("Land not found with id: " + landId);
+        }
+
+        // then extract its full_code, converting it to sig_code
+        Land land = landOptional.get();
+        String full_code = land.getBeopjungDongCode();
+        String sig_code = full_code.substring(0, 5) + "00000";
+
+        // then fetch the area's information using sig_code
+        Optional<BeopjungDong> areaOptional = beopjungDongDao.findByFullCode(sig_code);
+        if (areaOptional.isEmpty()) {
+            throw new IllegalArgumentException("Area not found with full_code: " + sig_code);
+        }
+        
+        BeopjungDong area = areaOptional.get();
+        String address = area.getKoreanName();
+
+        // then fetch electricity cost
+        ElectricityCost electricityCost = electricityCostDao.findAllByFullCode(sig_code).get(0);
+        ElectricityCostInfo costInfo = ElectricityCostInfo.of(electricityCost);
+
+        // then fetch emergency texts
+        List<EmergencyText> emergencyText = emergencyTextDao.findByFullCode(sig_code);
+        EmergencyTextInfo textInfo = EmergencyTextInfo.fromDisasterList(emergencyText);
+
+        // lastly populations
+        // population data need to be accumulated - they're on EMD level
+        Population populationSum = populationDao.findAggregatedByFullCode(full_code);
+        PopulationInfo populationInfo = PopulationInfo.of(populationSum);
+
+        return new AreaDetailResponse(full_code, address ,costInfo, textInfo, populationInfo);
     }
 }

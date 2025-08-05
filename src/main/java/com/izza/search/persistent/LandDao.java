@@ -95,6 +95,19 @@ public class LandDao {
     }
 
     /**
+     * full_code로 토지 상세 정보 조회
+     */
+    public Optional<Land> findByFullCode(String fullCode) {
+        String sql = "SELECT *, " +
+                "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
+                "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
+                "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
+                "FROM land WHERE full_code = ?";
+        List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), fullCode);
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
      * 토지 폴리곤 데이터 조회 (Point 리스트 형태)
      */
     public Optional<List<Point>> findPolygonByUniqueNumber(String id) {
@@ -258,7 +271,7 @@ public class LandDao {
         if (filterRequest.useZoneCategories() != null && !filterRequest.useZoneCategories().isEmpty()) {
             // 카테고리 이름들을 실제 UseZoneCode 값들로 변환
             List<Integer> useZoneCodes = UseZoneCode.convertCategoryNamesToZoneCodes(filterRequest.useZoneCategories());
-            
+
             if (useZoneCodes != null && !useZoneCodes.isEmpty()) {
                 sql.append("AND use_district_code1 IN (");
                 for (int i = 0; i < useZoneCodes.size(); i++) {

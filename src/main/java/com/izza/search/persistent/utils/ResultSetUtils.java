@@ -65,6 +65,21 @@ public class ResultSetUtils {
     }
 
     /**
+     * Integer 타입 값을 안전하게 가져옴 (null 가능)
+     */
+    public static Optional<Integer> getIntegerSafe(ResultSet rs, String columnName) {
+        try {
+            int value = rs.getInt(columnName);
+            if (rs.wasNull()) {
+                return Optional.empty();
+            }
+            return Optional.of(value);
+        } catch (SQLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * BigDecimal 타입 값을 안전하게 가져옴 (null 가능)
      */
     public static Optional<java.math.BigDecimal> getBigDecimalSafe(ResultSet rs, String columnName) {
