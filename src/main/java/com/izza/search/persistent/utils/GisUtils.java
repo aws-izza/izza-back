@@ -18,7 +18,51 @@ import java.util.List;
 public class GisUtils {
     private static final GeometryFactory geometryFactory = new GeometryFactory();
 
-    // TODO: multipolygon일 경우를 고려해서 List<List<Point>> 형태로 반환해야함.
+    /**
+     * WKT를 멀티폴리곤을 고려한 List<List<Point>> 형태로 파싱
+     */
+    public List<List<Point>> parsePolygonToMultiPointList(String wkt) {
+        List<List<Point>> polygons = new ArrayList<>();
+        WKTReader reader = new WKTReader(geometryFactory);
+        Geometry geometry = null;
+        try {
+            geometry = reader.read(wkt);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (geometry instanceof Polygon) {
+            Polygon polygon = (Polygon) geometry;
+            List<Point> points = new ArrayList<>();
+            Coordinate[] coords = polygon.getExteriorRing().getCoordinates();
+            for (Coordinate coord : coords) {
+                points.add(new Point(coord.x, coord.y));
+            }
+            polygons.add(points);
+        } else if (geometry instanceof MultiPolygon) {
+            MultiPolygon multiPolygon = (MultiPolygon) geometry;
+            int numGeometries = multiPolygon.getNumGeometries();
+            for (int i = 0; i < numGeometries; i++) {
+                Polygon polygon = (Polygon) multiPolygon.getGeometryN(i);
+                List<Point> points = new ArrayList<>();
+                Coordinate[] coords = polygon.getExteriorRing().getCoordinates();
+                for (Coordinate coord : coords) {
+                    points.add(new Point(coord.x, coord.y));
+                }
+                polygons.add(points);
+            }
+        } else {
+            throw new IllegalArgumentException("Unsupported geometry type: " + geometry.getGeometryType());
+        }
+
+        return polygons;
+    }
+
+    /**
+     * 기존 호환성을 위한 단일 폴리곤 파싱 메서드 (deprecated)
+     * @deprecated 멀티폴리곤을 고려하지 않으므로 parsePolygonToMultiPointList 사용 권장
+     */
+    @Deprecated
     public List<Point> parsePolygonToPointList(String wkt) {
         List<Point> points = new ArrayList<>();
         WKTReader reader = new WKTReader(geometryFactory);

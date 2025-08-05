@@ -86,11 +86,11 @@ public class MapSearchService {
             String polygonType,
             String id) {
 
-        if (polygonType.equals("GROUP")) { // 토지 폴리곤
-            List<Point> areaPolygon = beopjungDongDao.findPolygonByFullCode(id).orElse(List.of());
+        if (polygonType.equals("GROUP")) { // 행정구역 폴리곤
+            List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("LAND")) { // 행정구역 폴리곤
-            List<Point> landPolygon = landDao.findPolygonByUniqueNumber(id).orElse(List.of());
+        } else if (polygonType.equals("LAND")) { // 토지 폴리곤
+            List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
             return new PolygonDataResponse(landPolygon);
         } else { // 에러
             throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);

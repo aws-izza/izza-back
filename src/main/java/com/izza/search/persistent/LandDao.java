@@ -95,15 +95,15 @@ public class LandDao {
     }
 
     /**
-     * 토지 폴리곤 데이터 조회 (Point 리스트 형태)
+     * 토지 폴리곤 데이터 조회 (멀티폴리곤 지원)
      */
-    public Optional<List<Point>> findPolygonByUniqueNumber(String id) {
+    public List<List<Point>> findPolygonByUniqueNumber(String id) {
         String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE unique_no = ?";
-        List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
+        List<List<Point>> results = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
             String wkt = rs.getString("boundary_wkt");
-            return GisUtils.parsePolygonToPointList(wkt);
+            return GisUtils.parsePolygonToMultiPointList(wkt);
         }, id);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        return results;
     }
 
     /**
