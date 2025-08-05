@@ -4,7 +4,7 @@ import com.izza.search.domain.BeopjungDongType;
 import java.util.List;
 
 public record CountLandQuery(
-        String beopjungDongCode,
+        List<String> beopjungDongCodes,
         BeopjungDongType type,
         Long landAreaMin,
         Long landAreaMax,

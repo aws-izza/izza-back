@@ -4,6 +4,7 @@ import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
+import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
@@ -19,6 +20,7 @@ import com.izza.search.vo.UseZoneCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,7 +33,7 @@ public class MapSearchService {
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
         ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
-        if(zoomLevel.equals(ZoomLevel.LAND)) {
+        if (zoomLevel.equals(ZoomLevel.LAND)) {
             return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
         } else {
             return getGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
@@ -51,48 +53,60 @@ public class MapSearchService {
 
     private List<LandGroupSearchResponse> getGroupSearchResponses(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+        ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
         MapSearchQuery mapSearchQuery = new MapSearchQuery(
-                ZoomLevel.from(mapSearchRequest.zoomLevel()),
+                zoomLevel,
                 new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
                 new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat()));
 
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
-        return beopjeongDongs.stream().map(beopjungDong -> {
-            // String -> UseZoneCategory -> UseZoneCode.code 로 변환
-            List<Integer> useZoneIds = UseZoneCode
-                    .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+        List<Integer> useZoneIds = UseZoneCode
+                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
 
-            CountLandQuery query = new CountLandQuery(
-                    beopjungDong.getFullCode(),
-                    BeopjungDongType.valueOf(beopjungDong.getType().trim()),
-                    landSearchFilterRequest.landAreaMin(),
-                    landSearchFilterRequest.landAreaMax(),
-                    landSearchFilterRequest.officialLandPriceMin(),
-                    landSearchFilterRequest.officialLandPriceMax(),
-                    useZoneIds);
+        CountLandQuery query = new CountLandQuery(
+                beopjeongDongs.stream().map(BeopjungDong::getFullCode).toList(),
+                BeopjungDongType.valueOf(zoomLevel.getType()),
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                useZoneIds);
 
-            long count = landDao.countLandsByRegion(query);
-            return new LandGroupSearchResponse(
+        List<LandCountQueryResult> landCountQueryResults = landDao.countLandsByRegion(query);
+
+        return zipFrom(beopjeongDongs, landCountQueryResults);
+    }
+
+    private List<LandGroupSearchResponse> zipFrom(
+            List<BeopjungDong> beopjeongDongs, List<LandCountQueryResult> landCountQueryResults
+    ) {
+        List<LandGroupSearchResponse> response = new ArrayList<>();
+        for (int i = 0; i < beopjeongDongs.size(); i++) {
+            BeopjungDong beopjungDong = beopjeongDongs.get(i);
+            LandCountQueryResult landCountQueryResult = landCountQueryResults.get(i);
+            response.add(new LandGroupSearchResponse(
                     beopjungDong.getFullCode(),
                     beopjungDong.getSimpleName(),
-                    count,
-                    beopjungDong.getCenterPoint(), "GROUP");
-        })
-                .toList();
+                    landCountQueryResult.count(),
+                    beopjungDong.getCenterPoint(),
+                    "GROUP"
+            ));
+        }
+        return response;
     }
 
     public PolygonDataResponse getPolygonDataById(
             String polygonType,
             String id) {
 
-        if (polygonType.equals("GROUP")) { // 행정구역 폴리곤
+        if (polygonType.equals("GROUP")) {
             List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("LAND")) { // 토지 폴리곤
+        } else if (polygonType.equals("LAND")) {
             List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
             return new PolygonDataResponse(landPolygon);
-        } else { // 에러
+        } else {
             throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);
         }
 

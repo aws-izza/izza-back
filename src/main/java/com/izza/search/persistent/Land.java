@@ -190,7 +190,7 @@ public class Land {
                 "id=" + id +
                 ", shapeId=" + shapeId +
                 ", uniqueNo='" + uniqueNo + '\'' +
-                ", beopjungDongCode='" + beopjungDongCode + '\'' +
+                ", beopjungDongCodes='" + beopjungDongCode + '\'' +
                 ", address='" + address + '\'' +
                 ", ledgerDivisionCode=" + ledgerDivisionCode +
                 ", ledgerDivisionName='" + ledgerDivisionName + '\'' +
