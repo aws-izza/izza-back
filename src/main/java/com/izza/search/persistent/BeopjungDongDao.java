@@ -45,8 +45,6 @@ public class BeopjungDongDao {
         params.add(mapSearchQuery.northEast().lng());
         params.add(mapSearchQuery.northEast().lat());
         params.add(mapSearchQuery.zoomLevel().getType());
-        System.out.println(sql);
-        System.out.println(mapSearchQuery);
 
         return jdbcTemplate.query(sql, new BeopjungDongRowMapper(), params.toArray());
     }
@@ -71,16 +69,15 @@ public class BeopjungDongDao {
     }
 
     /**
-     * 특정 행정구역 폴리곤 데이터 조회 (Point 리스트 형태)
+     * 특정 행정구역 폴리곤 데이터 조회 (멀티폴리곤 지원)
      */
-    public Optional<List<Point>> findPolygonByFullCode(String full_code) {
+    public List<List<Point>> findPolygonByFullCode(String full_code) {
         String sql = "SELECT ST_AsText(boundary) as boundary_wkt FROM beopjeong_dong WHERE full_code = ?";
-        List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
+        List<List<Point>> results = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
             String wkt = rs.getString("boundary_wkt");
-            List<Point> points = GisUtils.parsePolygonToPointList(wkt);
-            return points;
+            return GisUtils.parsePolygonToMultiPointList(wkt);
         }, full_code);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        return results;
     }
 
     private static class BeopjungDongRowMapper implements RowMapper<BeopjungDong> {

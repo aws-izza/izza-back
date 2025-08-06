@@ -1,8 +1,11 @@
 package com.izza.search.persistent;
 
+import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.search.persistent.utils.SqlConditionUtils;
+import com.izza.search.persistent.utils.SqlConditionUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.presentation.dto.MapSearchRequest;
@@ -33,11 +36,11 @@ public class LandDao {
     public List<Land> findLandsInMapBounds(MapSearchRequest mapRequest, LandSearchFilterRequest filterRequest) {
         StringBuilder sqlBuilder = new StringBuilder();
         String sql = """
-                 SELECT *,
-                 ST_AsText(boundary) as boundary_wkt,
-                 ST_X(center_point) as center_lng,
-                 ST_Y(center_point) as center_lat\s
-                 FROM land WHERE 1=1\s
+                  SELECT *,
+                  ST_AsText(boundary) as boundary_wkt,\s
+                  ST_X(center_point) as center_lng,\s
+                  ST_Y(center_point) as center_lat\s
+                  FROM land WHERE 1=1\s
                 """;
         sqlBuilder.append(sql);
 
@@ -108,68 +111,44 @@ public class LandDao {
     }
 
     /**
-     * 토지 폴리곤 데이터 조회 (Point 리스트 형태)
+     * 토지 폴리곤 데이터 조회 (멀티폴리곤 지원)
      */
-    public Optional<List<Point>> findPolygonByUniqueNumber(String id) {
+    public List<List<Point>> findPolygonByUniqueNumber(String id) {
         String sql = "SELECT ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt FROM land WHERE unique_no = ?";
-        List<List<Point>> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
+        List<List<Point>> results = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
             String wkt = rs.getString("boundary_wkt");
-            return GisUtils.parsePolygonToPointList(wkt);
+            return GisUtils.parsePolygonToMultiPointList(wkt);
         }, id);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        return results;
     }
 
-    /**
-     * 토지 폴리곤 데이터 조회 (GeoJSON 형태) - 기존 호환성을 위해 유지
-     */
-    public Optional<String> findPolygonGeoJsonById(Long id) {
-        String sql = "SELECT ST_AsGeoJSON(ST_Transform(boundary, 4326)) as geojson FROM land WHERE id = ?";
-        List<String> results = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("geojson"), id);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
-    }
-
-    public long countLandsByRegion(CountLandQuery countLandQuery) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT COUNT(*) FROM land ");
-
+    public List<LandCountQueryResult> countLandsByRegions(CountLandQuery query) {
+        List<String> unionQueries = new ArrayList<>();
         List<Object> params = new ArrayList<>();
 
-        int codeLength = countLandQuery.type().getCodeLength();
-        String truncatedCode = countLandQuery.beopjungDongCode().substring(0, codeLength);
-        sql.append("WHERE LEFT(full_code, ").append(codeLength).append(") = ? ");
-        params.add(truncatedCode);
+        // 각 프리픽스별로 UNION ALL 쿼리 생성
+        for (String prefix : query.fullCodePrefixes()) {
+            StringBuilder subQuery = new StringBuilder();
+            subQuery.append("SELECT '").append(prefix)
+                    .append("' as region_code, COUNT(*) as land_count FROM land WHERE full_code LIKE ? ");
 
-        if (countLandQuery.landAreaMin() != null) {
-            sql.append("AND land_area >= ? ");
-            params.add(countLandQuery.landAreaMin());
-        }
-        if (countLandQuery.landAreaMax() != null) {
-            sql.append("AND land_area <= ? ");
-            params.add(countLandQuery.landAreaMax());
-        }
-        if (countLandQuery.officialLandPriceMin() != null) {
-            sql.append("AND official_land_price >= ? ");
-            params.add(countLandQuery.officialLandPriceMin());
-        }
-        if (countLandQuery.officialLandPriceMax() != null) {
-            sql.append("AND official_land_price <= ? ");
-            params.add(countLandQuery.officialLandPriceMax());
+            params.add(prefix + "%");
+
+            // SqlConditionUtils를 사용한 조건들 추가 (BETWEEN 사용)
+            SqlConditionUtils.between(subQuery, params,
+                    "land_area", query.landAreaMin(), query.landAreaMax());
+            SqlConditionUtils.between(subQuery, params,
+                    "official_land_price", query.officialLandPriceMin(), query.officialLandPriceMax());
+            SqlConditionUtils.in(subQuery, params, "use_district_code1", query.useZoneIds());
+
+            unionQueries.add(subQuery.toString());
         }
 
-        // 용도지역 코드 필터링 (실제 UseZoneCode 값 사용)
-        if (countLandQuery.useZoneIds() != null && !countLandQuery.useZoneIds().isEmpty()) {
-            sql.append("AND use_district_code1 IN (");
-            for (int i = 0; i < countLandQuery.useZoneIds().size(); i++) {
-                if (i > 0) {
-                    sql.append(", ");
-                }
-                sql.append("?");
-                params.add(countLandQuery.useZoneIds().get(i));
-            }
-            sql.append(") ");
-        }
+        String finalQuery = String.join(" UNION ALL ", unionQueries);
 
-        return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+        return jdbcTemplate.query(finalQuery, (rs, rowNum) -> new LandCountQueryResult(
+                rs.getString("region_code"),
+                rs.getLong("land_count")), params.toArray());
     }
 
     /**
@@ -269,7 +248,6 @@ public class LandDao {
     private void addUseZoneCategoryFilters(StringBuilder sql, List<Object> params,
             LandSearchFilterRequest filterRequest) {
         if (filterRequest.useZoneCategories() != null && !filterRequest.useZoneCategories().isEmpty()) {
-            // 카테고리 이름들을 실제 UseZoneCode 값들로 변환
             List<Integer> useZoneCodes = UseZoneCode.convertCategoryNamesToZoneCodes(filterRequest.useZoneCategories());
 
             if (useZoneCodes != null && !useZoneCodes.isEmpty()) {
