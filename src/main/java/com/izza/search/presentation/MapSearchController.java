@@ -44,7 +44,7 @@ public class MapSearchController {
         description = """
                 특정 행정구역 또는 토지의 폴리곤 데이터를 조회합니다. \n
                 행정구역은 법정동 코드로, 토지는 토지번호로 조회합니다.
-                        """)
+                """)
     public BaseApiResponse<PolygonDataResponse> getLandPolygon(
             // polygonType: group (행정구역) || land (토지)
             @RequestParam("polygonType") String polygonType,

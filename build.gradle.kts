@@ -45,6 +45,7 @@ dependencies {
     implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager")
 
     // Utils
+    implementation("org.locationtech.jts:jts-core:1.20.0")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
 

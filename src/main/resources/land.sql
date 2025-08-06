@@ -1,3 +1,4 @@
+-- auto-generated definition
 create table land
 (
     id                   bigint generated always as identity
@@ -34,6 +35,10 @@ create table land
     updated_at           timestamp default CURRENT_TIMESTAMP
 );
 
+-- land 테이블 공간 인덱스
+create index idx_land_full_code on land(full_code);
+create index idx_land_center_point_gist on land using gist(center_point);
+
 
 
 create table beopjeong_dong (
@@ -49,3 +54,5 @@ create table beopjeong_dong (
     boundary                geometry(Geometry, 4326)   -- area_polygon.geometry
 );
 
+-- beopjeong_dong 테이블 공간 인덱스
+create index idx_beopjeong_dong_boundary_gist on beopjeong_dong using gist(boundary);

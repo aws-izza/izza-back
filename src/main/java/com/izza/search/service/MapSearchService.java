@@ -4,19 +4,22 @@ import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
-import com.izza.search.persistent.query.CountLandQuery;
-import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
+import com.izza.search.persistent.dto.LandCountQueryResult;
+import com.izza.search.persistent.query.CountLandQuery;
+import com.izza.search.persistent.query.MapSearchQuery;
 import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
 import com.izza.search.vo.Point;
+import com.izza.search.vo.UseZoneCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,59 +31,93 @@ public class MapSearchService {
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
-        if (mapSearchRequest.zoomLevel() < 10) {
-            return getLandGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
+        ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
+        if (zoomLevel.equals(ZoomLevel.LAND)) {
+            return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
         } else {
-            List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
-
-            return lands.stream().map(land -> new LandGroupSearchResponse(
-                    land.getUniqueNo().toString(),
-                    land.getAddress(),
-                    null,
-                    land.getCenterPoint(),
-                    "LAND")).toList();
+            return getGroupSearchResponses(mapSearchRequest, landSearchFilterRequest);
         }
     }
 
-    private List<LandGroupSearchResponse> getLandGroupSearchResponses(
+    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
+                                                                 LandSearchFilterRequest landSearchFilterRequest) {
+        List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
+
+        return lands.stream().map(land -> new LandGroupSearchResponse(
+                land.getUniqueNo(),
+                land.getAddress(),
+                null,
+                land.getCenterPoint(),
+                "LAND")).toList();
+    }
+
+    private List<LandGroupSearchResponse> getGroupSearchResponses(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+        ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
         MapSearchQuery mapSearchQuery = new MapSearchQuery(
-                ZoomLevel.from(mapSearchRequest.zoomLevel()),
+                zoomLevel,
                 new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
                 new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat()));
 
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
-        return beopjeongDongs.stream().map(beopjungDong -> {
+        List<Integer> useZoneIds = UseZoneCode
+                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+
+        BeopjungDongType beopjungDongType = BeopjungDongType.valueOf(zoomLevel.getType());
+        List<String> fullCodePrefixes = beopjeongDongs.stream()
+                .map(dong -> dong.getFullCode().substring(0, beopjungDongType.getCodeLength()))
+                .distinct()
+                .toList();
+
+        List<LandCountQueryResult> landCountQueryResults = new ArrayList<>();
+
+        if (!beopjeongDongs.isEmpty()) {
             CountLandQuery query = new CountLandQuery(
-                    beopjungDong.getFullCode(),
-                    BeopjungDongType.valueOf(beopjungDong.getType().trim()),
+                    fullCodePrefixes,
                     landSearchFilterRequest.landAreaMin(),
                     landSearchFilterRequest.landAreaMax(),
                     landSearchFilterRequest.officialLandPriceMin(),
-                    landSearchFilterRequest.officialLandPriceMax());
+                    landSearchFilterRequest.officialLandPriceMax(),
+                    useZoneIds);
 
-            long count = landDao.countLandsByRegion(query);
-            return new LandGroupSearchResponse(
+            landCountQueryResults = landDao.countLandsByRegions(query);
+        }
+
+        return zipFrom(beopjeongDongs, landCountQueryResults);
+    }
+
+    private List<LandGroupSearchResponse> zipFrom(
+            List<BeopjungDong> beopjeongDongs, List<LandCountQueryResult> landCountQueryResults) {
+        List<LandGroupSearchResponse> response = new ArrayList<>();
+        for (BeopjungDong beopjungDong : beopjeongDongs) {
+            Long count = landCountQueryResults.stream()
+                    .filter(result -> beopjungDong.getFullCode().startsWith(result.beopjungDongCodePrefix()))
+                    .findAny()
+                    .map(LandCountQueryResult::count)
+                    .orElse(0L);
+
+            response.add(new LandGroupSearchResponse(
                     beopjungDong.getFullCode(),
                     beopjungDong.getSimpleName(),
                     count,
-                    beopjungDong.getCenterPoint(), "GROUP");
-        })
-                .toList();
+                    beopjungDong.getCenterPoint(),
+                    "GROUP"));
+        }
+        return response;
     }
 
     public PolygonDataResponse getPolygonDataById(
             String polygonType,
             String id) {
 
-        if (polygonType.equals("GROUP")) { // 토지 폴리곤
-            List<Point> areaPolygon = beopjungDongDao.findPolygonByFullCode(id).orElse(List.of());
+        if (polygonType.equals("GROUP")) {
+            List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("LAND")) { // 행정구역 폴리곤
-            List<Point> landPolygon = landDao.findPolygonByUniqueNumber(id).orElse(List.of());
+        } else if (polygonType.equals("LAND")) {
+            List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
             return new PolygonDataResponse(landPolygon);
-        } else { // 에러
+        } else {
             throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);
         }
 
