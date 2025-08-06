@@ -1,9 +1,9 @@
 package com.izza.search.presentation;
 
 import com.izza.search.persistent.LandDao;
-import com.izza.search.presentation.dto.BaseApiResponse;
+import com.izza.search.presentation.dto.response.BaseApiResponse;
 import com.izza.search.presentation.dto.LongRangeDto;
-import com.izza.search.presentation.dto.UseZoneCategoryResponse;
+import com.izza.search.presentation.dto.response.UseZoneCategoryResponse;
 import com.izza.search.vo.UseZoneCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

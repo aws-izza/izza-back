@@ -1,4 +1,4 @@
-package com.izza.search.presentation.dto;
+package com.izza.search.presentation.dto.response;
 
 import com.izza.search.vo.Point;
 import io.swagger.v3.oas.annotations.media.Schema;

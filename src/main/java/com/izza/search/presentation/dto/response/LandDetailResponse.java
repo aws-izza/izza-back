@@ -1,4 +1,4 @@
-package com.izza.search.presentation.dto;
+package com.izza.search.presentation.dto.response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

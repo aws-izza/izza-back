@@ -1,4 +1,4 @@
-package com.izza.search.presentation.dto;
+package com.izza.search.presentation.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;

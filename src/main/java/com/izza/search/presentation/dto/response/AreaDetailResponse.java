@@ -1,4 +1,4 @@
-package com.izza.search.presentation.dto;
+package com.izza.search.presentation.dto.response;
 
 import com.izza.search.vo.ElectricityCostInfo;
 import com.izza.search.vo.EmergencyTextInfo;

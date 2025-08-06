@@ -1,13 +1,13 @@
 package com.izza.search.presentation;
 
 import com.izza.search.service.MapSearchService;
-import com.izza.search.presentation.dto.AreaDetailResponse;
-import com.izza.search.presentation.dto.BaseApiResponse;
-import com.izza.search.presentation.dto.LandDetailResponse;
-import com.izza.search.presentation.dto.LandGroupSearchResponse;
-import com.izza.search.presentation.dto.LandSearchFilterRequest;
-import com.izza.search.presentation.dto.MapSearchRequest;
-import com.izza.search.presentation.dto.PolygonDataResponse;
+import com.izza.search.presentation.dto.response.AreaDetailResponse;
+import com.izza.search.presentation.dto.response.BaseApiResponse;
+import com.izza.search.presentation.dto.response.LandDetailResponse;
+import com.izza.search.presentation.dto.response.LandGroupSearchResponse;
+import com.izza.search.presentation.dto.request.LandSearchFilterRequest;
+import com.izza.search.presentation.dto.request.MapSearchRequest;
+import com.izza.search.presentation.dto.response.PolygonDataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
