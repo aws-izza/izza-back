@@ -4,6 +4,8 @@ import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.search.persistent.utils.SqlConditionUtils;
+import com.izza.search.persistent.utils.SqlConditionUtils;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.presentation.dto.MapSearchRequest;
@@ -46,7 +48,7 @@ public class LandDao {
 
         // 지도 영역 필터링 (4326 좌표계로 직접 비교)
         if (mapRequest.southWestLat() != null && mapRequest.southWestLng() != null &&
-            mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
+                mapRequest.northEastLat() != null && mapRequest.northEastLng() != null) {
             sqlBuilder.append("AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326)) ");
             params.add(mapRequest.southWestLng());
             params.add(mapRequest.southWestLat());
@@ -87,10 +89,10 @@ public class LandDao {
      */
     public Optional<Land> findById(String id) {
         String sql = "SELECT *, " +
-                     "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
-                     "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
-                     "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
-                     "FROM land WHERE unique_no = ?";
+                "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
+                "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
+                "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
+                "FROM land WHERE unique_no = ?";
         List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -107,76 +109,33 @@ public class LandDao {
         return results;
     }
 
-    /**
-     * 토지 폴리곤 데이터 조회 (GeoJSON 형태) - 기존 호환성을 위해 유지
-     */
-    public Optional<String> findPolygonGeoJsonById(Long id) {
-        String sql = "SELECT ST_AsGeoJSON(ST_Transform(boundary, 4326)) as geojson FROM land WHERE id = ?";
-        List<String> results = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("geojson"), id);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
-    }
-
-    public List<LandCountQueryResult> countLandsByRegion(CountLandQuery countLandQuery) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT LEFT(full_code, ").append(countLandQuery.type().getCodeLength()).append(") as region_code, COUNT(*) as land_count FROM land ");
-
+    public List<LandCountQueryResult> countLandsByRegions(CountLandQuery query) {
+        List<String> unionQueries = new ArrayList<>();
         List<Object> params = new ArrayList<>();
 
-        int codeLength = countLandQuery.type().getCodeLength();
+        // 각 프리픽스별로 UNION ALL 쿼리 생성
+        for (String prefix : query.fullCodePrefixes()) {
+            StringBuilder subQuery = new StringBuilder();
+            subQuery.append("SELECT '").append(prefix)
+                    .append("' as region_code, COUNT(*) as land_count FROM land WHERE full_code LIKE ? ");
 
-        List<String> codes = countLandQuery.beopjungDongCodes().stream()
-                .map(b -> b.substring(0, codeLength))
-                .toList();
+            params.add(prefix + "%");
 
-        // IN 조건으로 변경
-        sql.append("WHERE LEFT(full_code, ").append(codeLength).append(") IN (");
-        for (int i = 0; i < codes.size(); i++) {
-            if (i > 0) {
-                sql.append(", ");
-            }
-            sql.append("?");
-            params.add(codes.get(i));
-        }
-        sql.append(") ");
+            // SqlConditionUtils를 사용한 조건들 추가 (BETWEEN 사용)
+            SqlConditionUtils.between(subQuery, params,
+                    "land_area", query.landAreaMin(), query.landAreaMax());
+            SqlConditionUtils.between(subQuery, params,
+                    "official_land_price", query.officialLandPriceMin(), query.officialLandPriceMax());
+            SqlConditionUtils.in(subQuery, params, "use_district_code1", query.useZoneIds());
 
-        if (countLandQuery.landAreaMin() != null) {
-            sql.append("AND land_area >= ? ");
-            params.add(countLandQuery.landAreaMin());
-        }
-        if (countLandQuery.landAreaMax() != null) {
-            sql.append("AND land_area <= ? ");
-            params.add(countLandQuery.landAreaMax());
-        }
-        if (countLandQuery.officialLandPriceMin() != null) {
-            sql.append("AND official_land_price >= ? ");
-            params.add(countLandQuery.officialLandPriceMin());
-        }
-        if (countLandQuery.officialLandPriceMax() != null) {
-            sql.append("AND official_land_price <= ? ");
-            params.add(countLandQuery.officialLandPriceMax());
+            unionQueries.add(subQuery.toString());
         }
 
-        // 용도지역 코드 필터링 (실제 UseZoneCode 값 사용)
-        if (countLandQuery.useZoneIds() != null && !countLandQuery.useZoneIds().isEmpty()) {
-            sql.append("AND use_district_code1 IN (");
-            for (int i = 0; i < countLandQuery.useZoneIds().size(); i++) {
-                if (i > 0) {
-                    sql.append(", ");
-                }
-                sql.append("?");
-                params.add(countLandQuery.useZoneIds().get(i));
-            }
-            sql.append(") ");
-        }
+        String finalQuery = String.join(" UNION ALL ", unionQueries);
 
-        sql.append("GROUP BY LEFT(full_code, ").append(codeLength).append(")");
-
-        System.out.println(sql);
-
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new LandCountQueryResult(
+        return jdbcTemplate.query(finalQuery, (rs, rowNum) -> new LandCountQueryResult(
                 rs.getString("region_code"),
-                rs.getLong("land_count")
-        ), params.toArray());
+                rs.getLong("land_count")), params.toArray());
     }
 
     /**
@@ -274,7 +233,7 @@ public class LandDao {
      * 용도지역 카테고리 필터링 조건 추가
      */
     private void addUseZoneCategoryFilters(StringBuilder sql, List<Object> params,
-                                           LandSearchFilterRequest filterRequest) {
+            LandSearchFilterRequest filterRequest) {
         if (filterRequest.useZoneCategories() != null && !filterRequest.useZoneCategories().isEmpty()) {
             // 카테고리 이름들을 실제 UseZoneCode 값들로 변환
             List<Integer> useZoneCodes = UseZoneCode.convertCategoryNamesToZoneCodes(filterRequest.useZoneCategories());

@@ -4,11 +4,11 @@ import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
 import com.izza.search.persistent.BeopjungDong;
 import com.izza.search.persistent.BeopjungDongDao;
+import com.izza.search.persistent.Land;
+import com.izza.search.persistent.LandDao;
 import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.query.CountLandQuery;
 import com.izza.search.persistent.query.MapSearchQuery;
-import com.izza.search.persistent.Land;
-import com.izza.search.persistent.LandDao;
 import com.izza.search.presentation.dto.LandDetailResponse;
 import com.izza.search.presentation.dto.LandGroupSearchResponse;
 import com.izza.search.presentation.dto.LandSearchFilterRequest;
@@ -16,7 +16,6 @@ import com.izza.search.presentation.dto.MapSearchRequest;
 import com.izza.search.presentation.dto.PolygonDataResponse;
 import com.izza.search.vo.Point;
 import com.izza.search.vo.UseZoneCode;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -40,7 +39,8 @@ public class MapSearchService {
         }
     }
 
-    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+    private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
+                                                                 LandSearchFilterRequest landSearchFilterRequest) {
         List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
 
         return lands.stream().map(land -> new LandGroupSearchResponse(
@@ -64,34 +64,45 @@ public class MapSearchService {
         List<Integer> useZoneIds = UseZoneCode
                 .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
 
-        CountLandQuery query = new CountLandQuery(
-                beopjeongDongs.stream().map(BeopjungDong::getFullCode).toList(),
-                BeopjungDongType.valueOf(zoomLevel.getType()),
-                landSearchFilterRequest.landAreaMin(),
-                landSearchFilterRequest.landAreaMax(),
-                landSearchFilterRequest.officialLandPriceMin(),
-                landSearchFilterRequest.officialLandPriceMax(),
-                useZoneIds);
+        BeopjungDongType beopjungDongType = BeopjungDongType.valueOf(zoomLevel.getType());
+        List<String> fullCodePrefixes = beopjeongDongs.stream()
+                .map(dong -> dong.getFullCode().substring(0, beopjungDongType.getCodeLength()))
+                .distinct()
+                .toList();
 
-        List<LandCountQueryResult> landCountQueryResults = landDao.countLandsByRegion(query);
+        List<LandCountQueryResult> landCountQueryResults = new ArrayList<>();
+
+        if (!beopjeongDongs.isEmpty()) {
+            CountLandQuery query = new CountLandQuery(
+                    fullCodePrefixes,
+                    landSearchFilterRequest.landAreaMin(),
+                    landSearchFilterRequest.landAreaMax(),
+                    landSearchFilterRequest.officialLandPriceMin(),
+                    landSearchFilterRequest.officialLandPriceMax(),
+                    useZoneIds);
+
+            landCountQueryResults = landDao.countLandsByRegions(query);
+        }
 
         return zipFrom(beopjeongDongs, landCountQueryResults);
     }
 
     private List<LandGroupSearchResponse> zipFrom(
-            List<BeopjungDong> beopjeongDongs, List<LandCountQueryResult> landCountQueryResults
-    ) {
+            List<BeopjungDong> beopjeongDongs, List<LandCountQueryResult> landCountQueryResults) {
         List<LandGroupSearchResponse> response = new ArrayList<>();
-        for (int i = 0; i < beopjeongDongs.size(); i++) {
-            BeopjungDong beopjungDong = beopjeongDongs.get(i);
-            LandCountQueryResult landCountQueryResult = landCountQueryResults.get(i);
+        for (BeopjungDong beopjungDong : beopjeongDongs) {
+            Long count = landCountQueryResults.stream()
+                    .filter(result -> beopjungDong.getFullCode().startsWith(result.beopjungDongCodePrefix()))
+                    .findAny()
+                    .map(LandCountQueryResult::count)
+                    .orElse(0L);
+
             response.add(new LandGroupSearchResponse(
                     beopjungDong.getFullCode(),
                     beopjungDong.getSimpleName(),
-                    landCountQueryResult.count(),
+                    count,
                     beopjungDong.getCenterPoint(),
-                    "GROUP"
-            ));
+                    "GROUP"));
         }
         return response;
     }

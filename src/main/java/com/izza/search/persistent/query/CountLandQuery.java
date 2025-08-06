@@ -1,11 +1,9 @@
 package com.izza.search.persistent.query;
 
-import com.izza.search.domain.BeopjungDongType;
 import java.util.List;
 
 public record CountLandQuery(
-        List<String> beopjungDongCodes,
-        BeopjungDongType type,
+        List<String> fullCodePrefixes,
         Long landAreaMin,
         Long landAreaMax,
         Long officialLandPriceMin,
