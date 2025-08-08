@@ -20,23 +20,16 @@ public class LandAnalysisService {
      * 토지 면적 점수 계산
      */
     public BigDecimal calculateLandAreaScore(Long min_land_area, Long max_land_area, Long landId) {
-        // base_score + (x - min_land_size) / (max_land_size - min_land_size) * (1 -
-        // base_score)
 
         try {
 
-            Optional<Land> landOptional = landDao.findById(landId);
-            if (landOptional.isEmpty()) {
-                throw new IllegalArgumentException("Land not found with id: " + landId);
-            }
-
-            Land land = landOptional.get();
+            Land land = unwrapLandOptional(landDao.findById(landId), landId);
             BigDecimal land_size = land.getLandArea();
 
             // 점수 산정
-            // base_score + (x - 하한값) / (상한값 - 하한값) * (1 - base_score)
+            // base_score + (x - max) / (max - min) * (1 - base_score)
             BigDecimal score = BigDecimal.valueOf(BASE_SCORE)
-                    .add(land_size.subtract(BigDecimal.valueOf(min_land_area))
+                    .add(land_size.subtract(BigDecimal.valueOf(max_land_area))
                             .divide(BigDecimal.valueOf(max_land_area - min_land_area))
                             .multiply(BigDecimal.valueOf(1 - BASE_SCORE)));
 
@@ -67,16 +60,11 @@ public class LandAnalysisService {
 
         try {
 
-            Optional<Land> landOptional = landDao.findById(landId);
-            if (landOptional.isEmpty()) {
-                throw new IllegalArgumentException("Land not found with id: " + landId);
-            }
-
-            Land land = landOptional.get();
+            Land land = unwrapLandOptional(landDao.findById(landId), landId);
             BigDecimal land_price = land.getOfficialLandPrice();
 
             // 점수 산정
-            // base_score + (상한값 - x) / (상한값 - 하한값) * (1 - base_score)
+            // base_score + (max - x) / (max - min) * (1 - base_score)
             BigDecimal score = BigDecimal.valueOf(BASE_SCORE)
                     .add(BigDecimal.valueOf(max_land_price).subtract(land_price)
                             .divide(BigDecimal.valueOf(max_land_price - min_land_price))
@@ -103,24 +91,23 @@ public class LandAnalysisService {
     /*
      * 용도지역 점수 계산
      */
-    public BigDecimal calculateLandCategoryScore(Long landId) {
-        // if land's landCategoryCode matches, return 1, else 0.
+    public BigDecimal calculateLandCategoryScore(Long landId, List<Integer> useDistrictCodes) {
+        // if land's useDistrictCode1 or useDistrictCode2 matches any of the supplied
+        // codes, return 1, else 0.
 
         try {
 
-            Optional<Land> landOptional = landDao.findById(landId);
-            if (landOptional.isEmpty()) {
-                throw new IllegalArgumentException("Land not found with id: " + landId);
-            }
+            Land land = unwrapLandOptional(landDao.findById(landId), landId);
 
-            Land land = landOptional.get();
-
-            // TODO:: isBuildableLand() isn't accurate
-            BigDecimal score = land.isBuildableLand() ? BigDecimal.ONE : BigDecimal.ZERO;
+            // 용도지구 코드 매칭 확인
+            boolean matches = useDistrictCodes.contains(land.getUseDistrict1().getCode()) ||
+                    useDistrictCodes.contains(land.getUseDistrict2().getCode());
+            BigDecimal score = matches ? BigDecimal.ONE : BigDecimal.ZERO;
 
             log.debug(
-                    "용도지역 점수 계산 완료. landId: {}, landCategoryCode: {}, landCategoryName: {}, isBuildable: {}, score: {}",
-                    landId, land.getLandCategoryCode(), land.getLandCategoryName(), land.isBuildableLand(), score);
+                    "용도지역 점수 계산 완료. landId: {}, useDistrictCode1: {}, useDistrictCode2: {}, targetCodes: {}, matches: {}, score: {}",
+                    landId, land.getUseDistrict1().getCode(), land.getUseDistrict2().getCode(),
+                    useDistrictCodes, matches, score);
 
             return score;
 
@@ -128,6 +115,14 @@ public class LandAnalysisService {
             log.error("용도지역 점수 계산 중 오류 발생. landId: {}", landId, e);
             return BigDecimal.ZERO;
         }
+    }
+
+    public Land unwrapLandOptional(Optional<Land> optionalLand, Long landId) {
+        if (optionalLand.isEmpty()) {
+            throw new IllegalArgumentException("Land not found with id: " + landId);
+        }
+
+        return optionalLand.get();
     }
 
 }
