@@ -1,6 +1,7 @@
-package com.izza.analysis.service;
+package com.izza.analysis.vo;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import com.izza.search.vo.LandCategoryCode;
 
 import lombok.Builder;

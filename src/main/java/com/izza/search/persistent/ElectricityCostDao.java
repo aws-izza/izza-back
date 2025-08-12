@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
@@ -61,6 +62,38 @@ public class ElectricityCostDao {
     }
 
     /**
+     * 전체 전기 요금 데이터에서 최소 단위 요금 조회
+     */
+    public Optional<BigDecimal> findMinUnitCost() {
+        String sql = """
+                SELECT MIN("unitCost") as min_unit_cost
+                FROM electricity
+                WHERE "unitCost" IS NOT NULL
+                """;
+
+        List<BigDecimal> results = jdbcTemplate.query(sql,
+                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "min_unit_cost").orElse(null));
+
+        return results.isEmpty() || results.get(0) == null ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * 전체 전기 요금 데이터에서 최대 단위 요금 조회
+     */
+    public Optional<BigDecimal> findMaxUnitCost() {
+        String sql = """
+                SELECT MAX("unitCost") as max_unit_cost
+                FROM electricity
+                WHERE "unitCost" IS NOT NULL
+                """;
+
+        List<BigDecimal> results = jdbcTemplate.query(sql,
+                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "max_unit_cost").orElse(null));
+
+        return results.isEmpty() || results.get(0) == null ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
      * 전기 요금 정보 RowMapper
      */
     private static class ElectricityCostRowMapper implements RowMapper<ElectricityCost> {
@@ -76,7 +109,7 @@ public class ElectricityCostDao {
             ResultSetUtils.getIntegerSafe(rs, "month").ifPresent(electricityCost::setMonth);
             ResultSetUtils.getStringSafe(rs, "metro").ifPresent(electricityCost::setMetro);
             ResultSetUtils.getStringSafe(rs, "city").ifPresent(electricityCost::setCity);
-            
+
             // BigDecimal 처리
             ResultSetUtils.getBigDecimalSafe(rs, "unitCost").ifPresent(electricityCost::setUnitCost);
 

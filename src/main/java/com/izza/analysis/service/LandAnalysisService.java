@@ -1,11 +1,15 @@
 package com.izza.analysis.service;
 
+import com.izza.analysis.vo.LandAnalysisResult;
 import com.izza.search.persistent.Land;
 import com.izza.search.persistent.LandDao;
+import com.izza.search.vo.LandCategoryCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +28,7 @@ public class LandAnalysisService {
 
         try {
 
-            Land land = unwrapLandOptional(landDao.findById(landId), landId);
+            Land land = unwrapLandOptional(landDao.findById(landId.toString()), landId);
             BigDecimal land_size = land.getLandArea();
 
             // 점수 산정
@@ -61,7 +65,7 @@ public class LandAnalysisService {
 
         try {
 
-            Land land = unwrapLandOptional(landDao.findById(landId), landId);
+            Land land = unwrapLandOptional(landDao.findById(landId.toString()), landId);
             BigDecimal land_price = land.getOfficialLandPrice();
 
             // 점수 산정
@@ -98,7 +102,7 @@ public class LandAnalysisService {
 
         try {
 
-            Land land = unwrapLandOptional(landDao.findById(landId), landId);
+            Land land = unwrapLandOptional(landDao.findById(landId.toString()), landId);
 
             // 용도지구 코드 매칭 확인
             boolean matches = useDistrictCodes.contains(land.getUseDistrict1().getCode()) ||
@@ -116,6 +120,76 @@ public class LandAnalysisService {
             log.error("용도지역 점수 계산 중 오류 발생. landId: {}", landId, e);
             return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * 토지의 종합 분석 결과 조회
+     */
+    public LandAnalysisResult analyzeLand(Long landId, Long minLandArea, Long maxLandArea,
+            Long minLandPrice, Long maxLandPrice,
+            List<Integer> useDistrictCodes) {
+        try {
+            // 토지 정보 조회
+            Land land = unwrapLandOptional(landDao.findById(landId.toString()), landId);
+
+            // 각 점수 계산
+            BigDecimal landAreaScore = calculateLandAreaScore(minLandArea, maxLandArea, landId);
+            BigDecimal landPriceScore = calculateLandPriceScore(minLandPrice, maxLandPrice, landId);
+            BigDecimal landCategoryScore = calculateLandCategoryScore(landId, useDistrictCodes);
+
+            // 용도지역 코드 결정 (useDistrict1이 우선, 없으면 useDistrict2)
+            LandCategoryCode landCategoryCode = land.getUseDistrict1() != null
+                    ? LandCategoryCode.fromCode(land.getUseDistrict1().getCode())
+                    : LandCategoryCode.fromCode(land.getUseDistrict2().getCode());
+
+            return LandAnalysisResult.builder()
+                    .landId(landId)
+                    .landArea(land.getLandArea())
+                    .landAreaScore(landAreaScore)
+                    .landPrice(land.getOfficialLandPrice())
+                    .landPriceScore(landPriceScore)
+                    .landCategoryCode(landCategoryCode)
+                    .landCategoryScore(landCategoryScore)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("토지 분석 중 오류 발생. landId: {}", landId, e);
+            throw new RuntimeException("토지 분석 실패", e);
+        }
+    }
+
+    /**
+     * 토지 통계 정보 조회
+     */
+    public Map<String, Object> getLandStatistics() {
+        Map<String, Object> statistics = new HashMap<>();
+
+        try {
+            // 토지 면적 범위 통계
+            var landAreaRange = landDao.getLandAreaRange();
+            statistics.put("landAreaMin", landAreaRange.min());
+            statistics.put("landAreaMax", landAreaRange.max());
+            statistics.put("landAreaRange", landAreaRange.max() - landAreaRange.min());
+
+            // 공시지가 범위 통계
+            var landPriceRange = landDao.getOfficialLandPriceRange();
+            statistics.put("landPriceMin", landPriceRange.min());
+            statistics.put("landPriceMax", landPriceRange.max());
+            statistics.put("landPriceRange", landPriceRange.max() - landPriceRange.min());
+
+            // 분석 설정 정보
+            statistics.put("baseScore", BASE_SCORE);
+            statistics.put("scoreCalculationMethod", "base_score + normalized_value * (1 - base_score)");
+
+            // 분석 메타데이터
+            statistics.put("analysisVersion", "1.0");
+            statistics.put("lastUpdated", java.time.LocalDateTime.now().toString());
+
+        } catch (Exception e) {
+            log.error("토지 통계 조회 중 오류 발생", e);
+        }
+
+        return statistics;
     }
 
     public Land unwrapLandOptional(Optional<Land> optionalLand, Long landId) {

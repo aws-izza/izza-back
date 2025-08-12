@@ -1,4 +1,4 @@
-package com.izza.analysis.service;
+package com.izza.analysis.vo;
 
 import com.izza.analysis.persistent.LandPowerInfrastructureProximity;
 import lombok.Builder;
