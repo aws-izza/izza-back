@@ -1,3 +1,4 @@
+-- auto-generated definition
 create table land
 (
     id                   bigint generated always as identity
@@ -36,6 +37,7 @@ create table land
 
 -- land 테이블 공간 인덱스
 create index idx_land_boundary_gist on land using gist(boundary);
+create index idx_land_full_code on land(full_code);
 create index idx_land_center_point_gist on land using gist(center_point);
 
 

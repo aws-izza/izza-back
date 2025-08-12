@@ -1,6 +1,8 @@
 package com.izza.search.vo;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import java.util.List;
 
 /**
  * 용도지역 코드 enum
@@ -72,23 +74,37 @@ public enum UseZoneCode {
                this == DISTRIBUTION_COMMERCIAL ||
                this == PLANNING_MANAGEMENT;
     }
+
+    /**
+     * 용도지역 카테고리 이름들을 실제 UseZoneCode 값들로 변환
+     */
+    public static List<Integer> convertCategoryNamesToZoneCodes(List<String> categoryNames) {
+        if (categoryNames == null || categoryNames.isEmpty()) {
+            return null;
+        }
+
+        return categoryNames.stream()
+                .flatMap(categoryName -> java.util.Arrays.stream(UseZoneCode.values())
+                        .filter(useZone -> useZone.getCategory().name().equals(categoryName))
+                        .map(UseZoneCode::getCode))
+                .toList();
+    }
     
     @Getter
+    @RequiredArgsConstructor
     public enum UseZoneCategory {
-        UNSPECIFIED("미분류"),
-        RESIDENTIAL("주거지역"),
-        COMMERCIAL("상업지역"),
-        INDUSTRIAL("공업지역"),
-        GREEN("녹지지역"),
-        MANAGEMENT("관리지역"),
-        AGRICULTURAL("농림지역"),
-        CONSERVATION("자연환경보전지역"),
-        OTHER("기타");
-        
+        UNSPECIFIED("미분류", false),
+        RESIDENTIAL("주거지역", false),
+        COMMERCIAL("상업지역", true),
+        INDUSTRIAL("공업지역", true),
+        GREEN("녹지지역", false),
+        MANAGEMENT("관리지역", true),
+        AGRICULTURAL("농림지역", false),
+        CONSERVATION("자연환경보전지역", false),
+        OTHER("기타", false);
+
         private final String displayName;
-        
-        UseZoneCategory(String displayName) {
-            this.displayName = displayName;
-        }
+        private final boolean enterpriseFit;
+
     }
 }
