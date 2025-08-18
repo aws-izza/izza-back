@@ -1,5 +1,5 @@
 # 1. Build stage
-FROM gradle:8.7-jdk17 AS builder
+FROM gradle:8.7-jdk21 AS builder
 WORKDIR /app
 COPY . .
 RUN gradle clean build -x test
