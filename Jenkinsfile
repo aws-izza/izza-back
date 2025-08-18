@@ -12,25 +12,32 @@ spec:
     - cat
     tty: true
     volumeMounts:
-    - name: kaniko-secret
+    - name: docker-config
       mountPath: /kaniko/.docker
-    - name: kaniko-cache
-      mountPath: /cache
+    - name: workspace-volume
+      mountPath: /workspace
   - name: aws-cli
     image: amazon/aws-cli:latest
     command:
     - cat
     tty: true
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+    - name: workspace-volume
+      mountPath: /workspace
   - name: git-tools
     image: alpine/git:latest
     command:
     - cat
     tty: true
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /workspace
   volumes:
-  - name: kaniko-secret
-    secret:
-      secretName: regcred
-  - name: kaniko-cache
+  - name: docker-config
+    emptyDir: {}
+  - name: workspace-volume
     emptyDir: {}
 """
         }
@@ -57,8 +64,14 @@ spec:
                         # ECR 로그인 토큰 생성
                         aws ecr get-login-password --region $AWS_DEFAULT_REGION > /tmp/ecr-token
                         
+                        # Kaniko 디렉토리 생성 (중요!)
+                        mkdir -p /kaniko/.docker
+                        
                         # Kaniko용 Docker config 생성
                         echo "{\\"auths\\":{\\"177716289679.dkr.ecr.ap-northeast-2.amazonaws.com\\":{\\"auth\\":\\"$(echo -n AWS:$(cat /tmp/ecr-token) | base64 -w 0)\\"}}}" > /kaniko/.docker/config.json
+                        
+                        # 권한 설정
+                        chmod 644 /kaniko/.docker/config.json
                     '''
                 }
             }
