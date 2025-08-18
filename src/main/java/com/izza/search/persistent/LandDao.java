@@ -125,7 +125,6 @@ public class LandDao {
         List<String> unionQueries = new ArrayList<>();
         List<Object> params = new ArrayList<>();
 
-        // 각 프리픽스별로 UNION ALL 쿼리 생성
         for (String prefix : query.fullCodePrefixes()) {
             StringBuilder subQuery = new StringBuilder();
             subQuery.append("SELECT '").append(prefix)
@@ -144,6 +143,7 @@ public class LandDao {
         }
 
         String finalQuery = String.join(" UNION ALL ", unionQueries);
+
 
         return jdbcTemplate.query(finalQuery, (rs, rowNum) -> new LandCountQueryResult(
                 rs.getString("region_code"),

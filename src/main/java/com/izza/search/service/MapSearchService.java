@@ -176,7 +176,7 @@ public class MapSearchService {
     public AreaDetailResponse getAreaDetails(
             String landId) {
         // first fetch the land of the land from landId
-        Optional<Land> landOptional = landDao.findByFullCode(landId);
+        Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
             throw new IllegalArgumentException("Land not found with id: " + landId);
         }
