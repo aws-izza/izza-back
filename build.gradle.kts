@@ -46,6 +46,7 @@ dependencies {
 
     // Utils
     implementation("org.locationtech.jts:jts-core:1.20.0")
+    implementation("net.logstash.logback:logstash-logback-encoder:8.1")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
 
