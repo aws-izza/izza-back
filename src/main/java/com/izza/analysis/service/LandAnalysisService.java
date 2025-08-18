@@ -1,8 +1,8 @@
 package com.izza.analysis.service;
 
 import com.izza.analysis.vo.LandAnalysisResult;
-import com.izza.search.persistent.Land;
-import com.izza.search.persistent.LandDao;
+import com.izza.search.persistent.dao.LandDao;
+import com.izza.search.persistent.model.Land;
 import com.izza.search.vo.LandCategoryCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

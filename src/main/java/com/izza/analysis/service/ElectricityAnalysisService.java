@@ -1,15 +1,16 @@
 package com.izza.analysis.service;
 
-import com.izza.search.persistent.ElectricityCost;
-import com.izza.search.persistent.ElectricityCostDao;
-import com.izza.search.persistent.Land;
-import com.izza.search.persistent.LandDao;
+import com.izza.search.persistent.dao.ElectricityCostDao;
+import com.izza.search.persistent.dao.LandDao;
+import com.izza.search.persistent.model.ElectricityCost;
+import com.izza.search.persistent.model.Land;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Optional;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -106,7 +107,7 @@ public class ElectricityAnalysisService {
      * Optional<ElectricityCost>를 ElectricityCost로 변환하는 유틸리티 메서드
      */
     private ElectricityCost unwrapElectricityCostOptional(Optional<ElectricityCost> optionalElectricityCost,
-            String landId, String fullCode) {
+                                                          String landId, String fullCode) {
         if (optionalElectricityCost.isEmpty()) {
             log.warn("전기 요금 정보를 찾을 수 없습니다. landId: {}, fullCode: {}", landId, fullCode);
             throw new IllegalArgumentException(
