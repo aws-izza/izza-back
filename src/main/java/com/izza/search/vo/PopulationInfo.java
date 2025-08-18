@@ -1,6 +1,6 @@
 package com.izza.search.vo;
 
-import com.izza.search.persistent.Population;
+import com.izza.search.persistent.model.Population;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import java.util.HashMap;

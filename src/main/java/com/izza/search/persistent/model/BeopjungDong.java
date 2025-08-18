@@ -1,4 +1,4 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.model;
 
 import com.izza.search.vo.Point;
 import lombok.AllArgsConstructor;

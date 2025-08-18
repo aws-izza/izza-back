@@ -1,6 +1,6 @@
 package com.izza.search.vo;
 
-import com.izza.search.persistent.EmergencyText;
+import com.izza.search.persistent.model.EmergencyText;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;

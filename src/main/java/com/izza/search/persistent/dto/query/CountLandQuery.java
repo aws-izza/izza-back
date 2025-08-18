@@ -1,4 +1,4 @@
-package com.izza.search.persistent.query;
+package com.izza.search.persistent.dto.query;
 
 import java.util.List;
 

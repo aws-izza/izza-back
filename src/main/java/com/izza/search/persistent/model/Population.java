@@ -1,4 +1,4 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.model;
 
 /**
  * 인구 정보 - 데이터베이스 매핑용 엔티티

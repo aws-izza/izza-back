@@ -1,6 +1,6 @@
 package com.izza.search.presentation;
 
-import com.izza.search.persistent.LandDao;
+import com.izza.search.persistent.dao.LandDao;
 import com.izza.search.presentation.dto.response.BaseApiResponse;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.presentation.dto.response.UseZoneCategoryResponse;

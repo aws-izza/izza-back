@@ -1,5 +1,6 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.dao;
 
+import com.izza.search.persistent.model.EmergencyText;
 import com.izza.search.persistent.utils.ResultSetUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

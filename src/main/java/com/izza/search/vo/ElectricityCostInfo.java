@@ -1,6 +1,6 @@
 package com.izza.search.vo;
 
-import com.izza.search.persistent.ElectricityCost;
+import com.izza.search.persistent.model.ElectricityCost;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.YearMonth;

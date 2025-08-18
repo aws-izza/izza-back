@@ -1,4 +1,4 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.model;
 
 import com.izza.search.vo.LandCategoryCode;
 import com.izza.search.vo.UseDistrictCode;

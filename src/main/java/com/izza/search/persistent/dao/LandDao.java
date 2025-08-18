@@ -1,7 +1,8 @@
-package com.izza.search.persistent;
+package com.izza.search.persistent.dao;
 
+import com.izza.search.persistent.model.Land;
 import com.izza.search.persistent.dto.LandCountQueryResult;
-import com.izza.search.persistent.query.CountLandQuery;
+import com.izza.search.persistent.dto.query.CountLandQuery;
 import com.izza.search.persistent.utils.GisUtils;
 import com.izza.search.persistent.utils.ResultSetUtils;
 import com.izza.search.persistent.utils.SqlConditionUtils;
