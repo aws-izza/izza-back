@@ -93,7 +93,7 @@ public class Land {
     public String getLandCategoryDescription() {
         return getLandCategory().getDescription();
     }
-    
+
     /**
      * 농업용 토지인지 확인
      */
