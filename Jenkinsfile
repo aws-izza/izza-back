@@ -110,7 +110,7 @@ spec:
         stage('Update Deployment YAML') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'github-credentials', 
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', 
                                                     usernameVariable: 'GIT_USERNAME', 
                                                     passwordVariable: 'GIT_PASSWORD')]) {
                         dir('izza-cd') {
