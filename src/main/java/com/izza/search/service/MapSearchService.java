@@ -12,6 +12,7 @@ import com.izza.search.persistent.dao.ElectricityCostDao;
 import com.izza.search.persistent.model.EmergencyText;
 import com.izza.search.persistent.dao.EmergencyTextDao;
 import com.izza.search.persistent.dto.query.CountLandQuery;
+import com.izza.search.persistent.dto.query.LandSearchQuery;
 import com.izza.search.persistent.dto.query.MapSearchQuery;
 import com.izza.search.persistent.model.Population;
 import com.izza.search.persistent.dao.PopulationDao;
@@ -54,7 +55,22 @@ public class MapSearchService {
 
     private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
             LandSearchFilterRequest landSearchFilterRequest) {
-        List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
+
+        List<Integer> useZoneIds = UseZoneCode
+                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+        // 새로운 통합 쿼리 DTO 사용
+        LandSearchQuery query = new LandSearchQuery(
+                mapSearchRequest.southWestLng(),
+                mapSearchRequest.southWestLat(),
+                mapSearchRequest.northEastLng(),
+                mapSearchRequest.northEastLat(),
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                useZoneIds);
+
+        List<Land> lands = landDao.findLands(query);
 
         return lands.stream().map(land -> new LandGroupSearchResponse(
                 land.getUniqueNo(),
@@ -208,6 +224,6 @@ public class MapSearchService {
         Population populationSum = populationDao.findAggregatedByFullCode(full_code);
         PopulationInfo populationInfo = PopulationInfo.of(populationSum);
 
-        return new AreaDetailResponse(full_code, address ,costInfo, textInfo, populationInfo);
+        return new AreaDetailResponse(full_code, address, costInfo, textInfo, populationInfo);
     }
 }

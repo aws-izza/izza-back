@@ -3,6 +3,7 @@ package com.izza.analysis.service;
 import com.izza.analysis.vo.LandAnalysisResult;
 import com.izza.search.persistent.dao.LandDao;
 import com.izza.search.persistent.model.Land;
+import com.izza.search.service.LandDataRangeService;
 import com.izza.search.vo.LandCategoryCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ public class LandAnalysisService {
 
     private static final Double BASE_SCORE = 0.5;
     private final LandDao landDao;
+    private final LandDataRangeService landDataRangeService;
 
     /*
      * 토지 면적 점수 계산
@@ -166,13 +168,13 @@ public class LandAnalysisService {
 
         try {
             // 토지 면적 범위 통계
-            var landAreaRange = landDao.getLandAreaRange();
+            var landAreaRange = landDataRangeService.getLandAreaRange();
             statistics.put("landAreaMin", landAreaRange.min());
             statistics.put("landAreaMax", landAreaRange.max());
             statistics.put("landAreaRange", landAreaRange.max() - landAreaRange.min());
 
             // 공시지가 범위 통계
-            var landPriceRange = landDao.getOfficialLandPriceRange();
+            var landPriceRange = landDataRangeService.getOfficialLandPriceRange();
             statistics.put("landPriceMin", landPriceRange.min());
             statistics.put("landPriceMax", landPriceRange.max());
             statistics.put("landPriceRange", landPriceRange.max() - landPriceRange.min());
