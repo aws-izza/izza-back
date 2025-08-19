@@ -1,5 +1,38 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:debug
+    command:
+    - sleep
+    args:
+    - 99d
+    volumeMounts:
+    - name: aws-secret
+      mountPath: /kaniko/.aws/
+    - name: docker-config
+      mountPath: /kaniko/.docker/
+  - name: aws-cli
+    image: amazon/aws-cli:latest
+    command:
+    - sleep
+    args:
+    - 99d
+  volumes:
+  - name: aws-secret
+    secret:
+      secretName: aws-credentials
+  - name: docker-config
+    configMap:
+      name: docker-config
+"""
+        }
+    }
     
     environment {
         ECR_REGISTRY = "177716289679.dkr.ecr.ap-northeast-2.amazonaws.com"
@@ -18,7 +51,6 @@ pipeline {
         stage('Checkout GitOps Repository') {
             steps {
                 script {
-                    // GitOps 저장소 클론
                     sh '''
                         if [ -d "izza-cd" ]; then
                             rm -rf izza-cd
@@ -34,7 +66,8 @@ pipeline {
                 script {
                     def timestamp = new Date().format('yyyyMMdd-HHmmss')
                     def shortCommit = env.GIT_COMMIT.take(7)
-                    env.IMAGE_TAG = "${env.BRANCH_NAME}-${timestamp}-${shortCommit}"
+                    def branchName = env.GIT_BRANCH.replaceAll('origin/', '')
+                    env.IMAGE_TAG = "${branchName}-${timestamp}-${shortCommit}"
                     env.FULL_IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${env.IMAGE_TAG}"
                     
                     echo "🏷️ Generated image tag: ${env.IMAGE_TAG}"
@@ -42,30 +75,34 @@ pipeline {
                 }
             }
         }
-
-        stage('Build Docker Image') {
+        stage('Debug AWS Credentials') {
             steps {
-                script {
-                    echo "🔧 도커 이미지 빌드 시작..."
-                    sh "docker build -t ${env.FULL_IMAGE_NAME} ."
-                    echo "✅ 도커 이미지 빌드 완료"
+                container('kaniko') {
+                    script {
+                        sh '''
+                            echo "=== AWS Credentials Check ==="
+                            ls -la /kaniko/.aws/
+                            echo "=== AWS Config Content ==="
+                            cat /kaniko/.aws/config || echo "Config file not found"
+                            echo "=== AWS Credentials Content (첫 줄만) ==="
+                            head -1 /kaniko/.aws/credentials || echo "Credentials file not found"
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Push to ECR') {
+        stage('Build and Push with Kaniko') {
             steps {
-                script {
-                    echo "📤 ECR에 이미지 푸시 시작..."
-                    sh """
-                        # ECR 로그인
-                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                        
-                        # 이미지 푸시
-                        docker push ${env.FULL_IMAGE_NAME}
-                    """
-                    echo "✅ ECR 푸시 완료: ${env.FULL_IMAGE_NAME}"
+                container('kaniko') {
+                    script {
+                        sh """
+                            /kaniko/executor \
+                                --dockerfile=Dockerfile \
+                                --context=dir://. \
+                                --destination=${env.FULL_IMAGE_NAME}
+                        """
+                    }
                 }
             }
         }
@@ -73,7 +110,7 @@ pipeline {
         stage('Update Deployment YAML') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'github-pat', 
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', 
                                                     usernameVariable: 'GIT_USERNAME', 
                                                     passwordVariable: 'GIT_PASSWORD')]) {
                         dir('izza-cd') {
@@ -104,7 +141,7 @@ pipeline {
             🎉 빌드 성공!
             
             📊 빌드 정보:
-            - 브랜치: ${env.BRANCH_NAME}
+            - 브랜치: ${env.GIT_BRANCH}
             - 이미지: ${env.FULL_IMAGE_NAME}
             - 커밋: ${env.GIT_COMMIT}
             """
@@ -112,11 +149,6 @@ pipeline {
         
         failure {
             echo "❌ 빌드 실패! 로그를 확인하세요."
-        }
-        
-        always {
-            // 로컬 이미지 정리
-            sh "docker rmi ${env.FULL_IMAGE_NAME} || true"
         }
     }
 }
