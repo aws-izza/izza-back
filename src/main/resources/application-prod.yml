@@ -2,13 +2,7 @@ spring:
   config:
     activate:
       on-profile: prod
-    import: 'aws-secretsmanager:rds!db-83437ad6-f925-4f4d-8340-f10ad49f12e9'
-  cloud:
-    aws:
-      region:
-        static: ap-northeast-2
-      secretsmanager:
-        region: ap-northeast-2
+    import: aws-secretsmanager:ap-northeast-2:rds!db-83437ad6-f925-4f4d-8340-f10ad49f12e9
   
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
