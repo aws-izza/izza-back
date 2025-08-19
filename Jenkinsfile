@@ -69,28 +69,34 @@ pipeline {
                 }
             }
         }
+        
         stage('Update Deployment YAML') {
             steps {
                 script {
-                    dir('izza-cd') {
-                        sh '''
-                            git config user.name "jenkins"
-                            git config user.email "jenkins@company.com"
-                        '''
-                        
-                        sh """
-                            sed -i 's|image: .*|image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' environments/dev/app.yaml
-                        """
-                        
-                        sh """
-                            git add environments/dev/app.yaml
-                            git commit -m "Update dev image tag to ${IMAGE_TAG}"
-                            git push origin main
-                        """
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', 
+                                                    usernameVariable: 'GIT_USERNAME', 
+                                                    passwordVariable: 'GIT_PASSWORD')]) {
+                        dir('izza-cd') {
+                            sh '''
+                                git config user.name "musclefrog"
+                                git config user.email "rlatndls113@gmail.com"
+                            '''
+                            
+                            sh """
+                                sed -i 's|image: .*|image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' environments/dev/app.yaml
+                            """
+                            
+                            sh """
+                                git add environments/dev/app.yaml
+                                git commit -m "Update dev image tag to ${IMAGE_TAG}"
+                                git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/aws-izza/izza-cd.git main
+                            """
+                        }
                     }
                 }
             }
         }
+    }
 
     post {
         success {
