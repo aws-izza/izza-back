@@ -22,4 +22,4 @@ RUN ./gradlew bootJar -x test
 EXPOSE 8080
 
 # 애플리케이션 실행
-CMD ["java", "-jar", "build/libs/izza-back-0.0.1-SNAPSHOT.jar"]
+CMD ["java", "-jar", "build/libs/izza-0.0.1-SNAPSHOT.jar"]
