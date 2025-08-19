@@ -40,6 +40,22 @@ create index idx_land_boundary_gist on land using gist(boundary);
 create index idx_land_full_code on land(full_code);
 create index idx_land_center_point_gist on land using gist(center_point);
 
+-- 토지 통계 테이블 생성
+create table land_statistics (
+    stat_type VARCHAR(50) PRIMARY KEY,
+    min_value BIGINT NOT NULL,
+    max_value BIGINT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 초기 데이터 삽입 (배치 작업으로 업데이트될 예정)
+INSERT INTO land_statistics (stat_type, min_value, max_value) VALUES 
+('land_area_range', 1, 1000000),
+('official_land_price_range', 1000, 10000000);
+
+-- 인덱스 생성 (빠른 조회를 위해)
+CREATE INDEX idx_land_statistics_stat_type ON land_statistics(stat_type);
+
 
 
 create table beopjeong_dong (

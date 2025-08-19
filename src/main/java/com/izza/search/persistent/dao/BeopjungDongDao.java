@@ -2,8 +2,8 @@ package com.izza.search.persistent.dao;
 
 import com.izza.search.persistent.model.BeopjungDong;
 import com.izza.search.persistent.dto.query.MapSearchQuery;
-import com.izza.search.persistent.utils.GisUtils;
-import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.utils.GisUtils;
+import com.izza.utils.ResultSetUtils;
 import com.izza.search.vo.Point;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

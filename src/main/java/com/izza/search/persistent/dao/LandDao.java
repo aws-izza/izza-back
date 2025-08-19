@@ -4,9 +4,9 @@ import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.dto.query.CountLandQuery;
 import com.izza.search.persistent.dto.query.LandSearchQuery;
 import com.izza.search.persistent.model.Land;
-import com.izza.search.persistent.utils.GisUtils;
-import com.izza.search.persistent.utils.ResultSetUtils;
-import com.izza.search.persistent.utils.SqlConditionUtils;
+import com.izza.utils.GisUtils;
+import com.izza.utils.ResultSetUtils;
+import com.izza.utils.SqlConditionUtils;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.vo.Point;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -74,34 +74,39 @@ public class LandDao {
     }
 
     public List<LandCountQueryResult> countLandsByRegions(CountLandQuery query) {
-        List<String> unionQueries = new ArrayList<>();
+        if (query.fullCodePrefixes().isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // 모든 prefix의 길이가 동일한지 확인하여 적절한 인덱스 사용
+        int prefixLength = query.fullCodePrefixes().getFirst().length();
+        
+        StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
-        for (String prefix : query.fullCodePrefixes()) {
-            StringBuilder subQuery = new StringBuilder();
-            subQuery.append("SELECT '").append(prefix)
-                    .append("' as region_code, COUNT(*) as land_count FROM land WHERE full_code LIKE ? ");
+        sql.append("SELECT LEFT(full_code, ?) as region_code, COUNT(*) as land_count ")
+           .append("FROM land WHERE LEFT(full_code, ?) ");
+        
+        params.add(prefixLength);
+        params.add(prefixLength);
+        
+        SqlConditionUtils.in(sql, params, "", query.fullCodePrefixes());
+        SqlConditionUtils.in(sql, params, "use_district_code1", query.useZoneIds());
+        
+        SqlConditionUtils.between(sql, params,
+                "land_area",
+                BigDecimal.valueOf(query.landAreaMin()),
+                BigDecimal.valueOf(query.landAreaMax()));
 
-            params.add(prefix + "%");
+        SqlConditionUtils.between(sql, params,
+                "official_land_price",
+                BigDecimal.valueOf(query.officialLandPriceMin()),
+                BigDecimal.valueOf(query.officialLandPriceMax()));
+        
+        sql.append(" GROUP BY LEFT(full_code, ?)");
+        params.add(prefixLength);
 
-            SqlConditionUtils.in(subQuery, params, "use_district_code1", query.useZoneIds());
-
-            SqlConditionUtils.between(subQuery, params,
-                    "land_area",
-                    BigDecimal.valueOf(query.landAreaMin()),
-                    BigDecimal.valueOf(query.landAreaMax()));
-
-            SqlConditionUtils.between(subQuery, params,
-                    "official_land_price",
-                    BigDecimal.valueOf(query.officialLandPriceMin()),
-                    BigDecimal.valueOf(query.officialLandPriceMax()));
-
-            unionQueries.add(subQuery.toString());
-        }
-
-        String finalQuery = String.join(" UNION ALL ", unionQueries);
-
-        return jdbcTemplate.query(finalQuery, (rs, rowNum) -> new LandCountQueryResult(
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new LandCountQueryResult(
                 rs.getString("region_code"),
                 rs.getLong("land_count")), params.toArray());
     }

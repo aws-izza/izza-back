@@ -1,7 +1,7 @@
 package com.izza.search.service;
 
-import com.izza.search.persistent.dao.LandDataRangeDynamoDao;
-import com.izza.search.persistent.model.LandDataRange;
+import com.izza.search.persistent.dao.LandStatisticsDao;
+import com.izza.search.persistent.model.LandStatistics;
 import com.izza.search.presentation.dto.LongRangeDto;
 import org.springframework.stereotype.Service;
 
@@ -10,13 +10,13 @@ import java.util.Optional;
 @Service
 public class LandDataRangeService {
 
-    private static final String LAND_AREA_RANGE_TYPE = "land_area";
-    private static final String OFFICIAL_LAND_PRICE_RANGE_TYPE = "official_land_price";
+    private static final String LAND_AREA_RANGE_TYPE = "land_area_range";
+    private static final String OFFICIAL_LAND_PRICE_RANGE_TYPE = "official_land_price_range";
 
-    private final LandDataRangeDynamoDao landDataRangeDynamoDao;
+    private final LandStatisticsDao landStatisticsDao;
 
-    public LandDataRangeService(LandDataRangeDynamoDao landDataRangeDynamoDao) {
-        this.landDataRangeDynamoDao = landDataRangeDynamoDao;
+    public LandDataRangeService(LandStatisticsDao landStatisticsDao) {
+        this.landStatisticsDao = landStatisticsDao;
     }
 
     public LongRangeDto getLandAreaRange() {
@@ -27,10 +27,10 @@ public class LandDataRangeService {
         return getRange(OFFICIAL_LAND_PRICE_RANGE_TYPE);
     }
 
-    private LongRangeDto getRange(String rangeType) {
-        Optional<LandDataRange> range = landDataRangeDynamoDao.findByRangeType(rangeType);
+    private LongRangeDto getRange(String statType) {
+        Optional<LandStatistics> statistics = landStatisticsDao.findByStatType(statType);
         
-        return range.map(dataRange -> new LongRangeDto(dataRange.getMinValue(), dataRange.getMaxValue()))
-                   .orElseThrow(() -> new IllegalArgumentException("Range data not found for type: " + rangeType));
+        return statistics.map(stat -> new LongRangeDto(stat.getMinValue(), stat.getMaxValue()))
+                        .orElseThrow(() -> new IllegalArgumentException("Statistics not found for type: " + statType));
     }
 }

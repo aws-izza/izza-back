@@ -203,7 +203,7 @@ class LandDaoTest extends DatabaseTestSupport {
             LandSearchQuery query = new LandSearchQuery(
                     null, null, null, null,  // 지도 영역 없음
                     null, null, null, null,
-                    List.of("주거지역")  // 용도지역 필터
+                    List.of(1)  // 용도지역 필터
             );
 
             // when
@@ -302,35 +302,6 @@ class LandDaoTest extends DatabaseTestSupport {
             // then
             assertThat(results).hasSize(1);
             assertThat(results.get(0).count()).isEqualTo(1L); // TEST-001만 해당
-        }
-    }
-
-    @Nested
-    @DisplayName("범위 조회 메서드 테스트")
-    class RangeQueryTest {
-
-        @Test
-        @DisplayName("토지 면적의 최소값과 최대값을 조회한다")
-        void getLandAreaRange_ReturnsCorrectRange() {
-            // when
-            LongRangeDto result = landDao.getLandAreaRange();
-
-            // then
-            assertThat(result).isNotNull();
-            assertThat(result.min()).isEqualTo(50L);  // TEST-003의 면적
-            assertThat(result.max()).isEqualTo(200L); // TEST-002의 면적
-        }
-
-        @Test
-        @DisplayName("공시지가의 최소값과 최대값을 조회한다")
-        void getOfficialLandPriceRange_ReturnsCorrectRange() {
-            // when
-            LongRangeDto result = landDao.getOfficialLandPriceRange();
-
-            // then
-            assertThat(result).isNotNull();
-            assertThat(result.min()).isEqualTo(500000L);  // TEST-003의 가격
-            assertThat(result.max()).isEqualTo(2000000L); // TEST-002의 가격
         }
     }
 }

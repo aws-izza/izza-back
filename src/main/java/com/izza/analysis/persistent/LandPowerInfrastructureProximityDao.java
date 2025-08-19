@@ -1,11 +1,10 @@
 package com.izza.analysis.persistent;
 
-import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.utils.ResultSetUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;

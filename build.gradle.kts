@@ -43,7 +43,6 @@ dependencies {
     // AWS
     implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:${springCloudAwsVersion}"))
     implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager")
-    implementation("io.awspring.cloud:spring-cloud-aws-starter-dynamodb")
 
     // Utils
     implementation("org.locationtech.jts:jts-core:1.20.0")

@@ -83,6 +83,7 @@ Each enum includes:
 Uses Spring JDBC with custom DAO implementations:
 - **LandDao**: Complex spatial queries, filtering, and statistics
 - **BeopjungDongDao**: Administrative district queries with polygon data
+- **LandStatisticsDao**: Precomputed statistics for land area/price ranges
 - **ElectricityCostDao, PopulationDao, EmergencyTextDao**: Supporting data for analysis
 
 ### Database Configuration
@@ -151,5 +152,29 @@ UseZoneCode zoneCode = UseZoneCode.fromCode(code);
 // Industrial suitability check
 if (landCategory.isLargeScaleIndustrialSuitable()) {
     // Handle industrial land logic
+}
+```
+
+### Land Statistics Management
+Range statistics (area/price) are stored in `land_statistics` table for performance:
+- Precomputed min/max values for land area and official land price
+- Updated via batch jobs (separate from API operations)
+- Used by analysis and search modules for normalization
+
+### Lombok Usage Guidelines
+When using `@Builder`, always attach it directly to the all-arguments constructor:
+```java
+@Data
+public class MyClass {
+    private String field1;
+    private Integer field2;
+    
+    public MyClass() {}
+    
+    @Builder
+    public MyClass(String field1, Integer field2) {
+        this.field1 = field1;
+        this.field2 = field2;
+    }
 }
 ```
