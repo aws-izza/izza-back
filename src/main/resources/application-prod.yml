@@ -8,6 +8,8 @@ spring:
     aws:
       region:
         static: ap-northeast-2
+      credentials:
+        instance-profile: false  # Force use of IRSA instead of instance profile
         
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
@@ -24,5 +26,6 @@ spring:
 # Add debug logging to see what's happening
 logging:
   level:
-    io.awspring.cloud: DEBUG
+    io.awspring.cloud.secretsmanager: DEBUG
+    software.amazon.awssdk: DEBUG
     root: INFO
