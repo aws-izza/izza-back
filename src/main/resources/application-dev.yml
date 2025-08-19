@@ -2,12 +2,11 @@ spring:
   config:
     activate:
       on-profile: dev
-    import: aws-secretsmanager:rds!db-83437ad6-f925-4f4d-8340-f10ad49f12e9-MmfOML
 
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
-    username: ${username}
-    password: ${password}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:defaultpass}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10  # Lower for dev

@@ -44,6 +44,10 @@ dependencies {
     implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:${springCloudAwsVersion}"))
     implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager")
 
+    // Explicit AWS SDK dependencies for direct API calls
+    implementation("software.amazon.awssdk:secretsmanager")
+    implementation("software.amazon.awssdk:sts")
+
     // Utils
     implementation("org.locationtech.jts:jts-core:1.20.0")
     implementation("net.logstash.logback:logstash-logback-encoder:8.1")
