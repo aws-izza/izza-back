@@ -18,6 +18,7 @@ import java.util.Map;
 @Slf4j
 public class SecretManagerConfig implements ApplicationListener<ApplicationEnvironmentPreparedEvent> {
 
+    // hi
     private static final String SECRET_ID = "rds!db-83437ad6-f925-4f4d-8340-f10ad49f12e9";
 
     @Override
