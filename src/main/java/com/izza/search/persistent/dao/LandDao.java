@@ -59,13 +59,13 @@ public class LandDao {
 
         // 토지 면적 필터링
         SqlConditionUtils.between(sqlBuilder, params,
-                "land_area", 
+                "land_area",
                 BigDecimal.valueOf(query.landAreaMin()),
                 BigDecimal.valueOf(query.landAreaMax()));
 
         // 공시지가 필터링
         SqlConditionUtils.between(sqlBuilder, params,
-                "official_land_price", 
+                "official_land_price",
                 BigDecimal.valueOf(query.officialLandPriceMin()),
                 BigDecimal.valueOf(query.officialLandPriceMax()));
 
@@ -77,22 +77,20 @@ public class LandDao {
         if (query.fullCodePrefixes().isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         // 모든 prefix의 길이가 동일한지 확인하여 적절한 인덱스 사용
         int prefixLength = query.fullCodePrefixes().getFirst().length();
-        
+
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
-        sql.append("SELECT LEFT(full_code, ?) as region_code, COUNT(*) as land_count ")
-           .append("FROM land WHERE LEFT(full_code, ?) ");
-        
-        params.add(prefixLength);
-        params.add(prefixLength);
-        
-        SqlConditionUtils.in(sql, params, "", query.fullCodePrefixes());
+        String leftQuery = "LEFT(full_code, " + prefixLength + ") ";
+        sql.append("SELECT " + leftQuery + "as region_code, COUNT(*) as land_count ")
+                .append("FROM land WHERE 1=1 ");
+
+        SqlConditionUtils.in(sql, params, leftQuery, query.fullCodePrefixes());
         SqlConditionUtils.in(sql, params, "use_district_code1", query.useZoneIds());
-        
+
         SqlConditionUtils.between(sql, params,
                 "land_area",
                 BigDecimal.valueOf(query.landAreaMin()),
@@ -102,10 +100,12 @@ public class LandDao {
                 "official_land_price",
                 BigDecimal.valueOf(query.officialLandPriceMin()),
                 BigDecimal.valueOf(query.officialLandPriceMax()));
-        
-        sql.append(" GROUP BY LEFT(full_code, ?)");
-        params.add(prefixLength);
 
+        sql.append(" GROUP BY ").append(leftQuery);
+
+        System.out.println(sql.toString());
+        System.out.println(params);
+        System.out.println("=========================");
         return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new LandCountQueryResult(
                 rs.getString("region_code"),
                 rs.getLong("land_count")), params.toArray());
@@ -116,10 +116,10 @@ public class LandDao {
      */
     public Optional<Land> findById(String id) {
         String sql = "SELECT *, " +
-                "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
-                "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
-                "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
-                "FROM land WHERE unique_no = ?";
+                     "ST_AsText(ST_Transform(boundary, 4326)) as boundary_wkt, " +
+                     "ST_X(ST_Transform(ST_Centroid(boundary), 4326)) as center_lng, " +
+                     "ST_Y(ST_Transform(ST_Centroid(boundary), 4326)) as center_lat " +
+                     "FROM land WHERE unique_no = ?";
         List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), id);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }

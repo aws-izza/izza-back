@@ -1,5 +1,6 @@
 package com.izza.search.domain;
 
+import com.izza.exception.BusinessException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +28,6 @@ public enum ZoomLevel {
                 return level;
             }
         }
-        throw new IllegalArgumentException("유효하지 않은 줌 레벨입니다: " + zoomLevel);
+        throw new BusinessException("유효하지 않은 줌 레벨입니다: " + zoomLevel);
     }
 }

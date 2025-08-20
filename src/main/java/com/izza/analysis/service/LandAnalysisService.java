@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
+import com.izza.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -196,7 +198,7 @@ public class LandAnalysisService {
 
     public Land unwrapLandOptional(Optional<Land> optionalLand, Long landId) {
         if (optionalLand.isEmpty()) {
-            throw new IllegalArgumentException("Land not found with id: " + landId);
+            throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
         }
 
         return optionalLand.get();

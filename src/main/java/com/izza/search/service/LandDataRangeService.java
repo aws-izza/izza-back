@@ -6,6 +6,8 @@ import com.izza.search.presentation.dto.LongRangeDto;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import com.izza.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 
 @Service
 public class LandDataRangeService {
@@ -31,6 +33,6 @@ public class LandDataRangeService {
         Optional<LandStatistics> statistics = landStatisticsDao.findByStatType(statType);
         
         return statistics.map(stat -> new LongRangeDto(stat.getMinValue(), stat.getMaxValue()))
-                        .orElseThrow(() -> new IllegalArgumentException("Statistics not found for type: " + statType));
+                        .orElseThrow(() -> new BusinessException("통계 데이터를 찾을 수 없습니다: " + statType, HttpStatus.NOT_FOUND));
     }
 }

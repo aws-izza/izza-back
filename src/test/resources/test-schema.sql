@@ -35,22 +35,35 @@ CREATE TABLE IF NOT EXISTS land (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 테스트용 간소화된 beopjung_dong 테이블
-CREATE TABLE IF NOT EXISTS beopjung_dong (
-    id BIGSERIAL PRIMARY KEY,
-    full_code VARCHAR(10) UNIQUE NOT NULL,
-    korean_name VARCHAR(255),
-    simple_name VARCHAR(255),
-    center_point GEOMETRY(POINT, 4326),
-    boundary GEOMETRY(MULTIPOLYGON, 4326),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+-- 실제 DDL 기반 beopjeong_dong 테이블
+CREATE TABLE IF NOT EXISTS beopjeong_dong (
+    full_code varchar(10) not null primary key,
+    parent_code varchar(10),
+    beopjung_dong_name text,
+    sido text,
+    sig text,
+    emd text,
+    ri text,
+    dong_type VARCHAR(4),
+    english_name text,
+    boundary geometry(Geometry, 4326),
+    center_point geometry(Point, 4326)
+);
+
+-- 테스트용 land_statistics 테이블
+CREATE TABLE IF NOT EXISTS land_statistics (
+    stat_type VARCHAR(50) PRIMARY KEY,
+    min_value BIGINT NOT NULL,
+    max_value BIGINT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 인덱스 생성
-CREATE INDEX IF NOT EXISTS idx_land_full_code ON land(full_code);
-CREATE INDEX IF NOT EXISTS idx_land_boundary ON land USING GIST(boundary);
-CREATE INDEX IF NOT EXISTS idx_land_center_point ON land USING GIST(center_point);
-CREATE INDEX IF NOT EXISTS idx_land_use_district_code1 ON land(use_district_code1);
-CREATE INDEX IF NOT EXISTS idx_beopjung_dong_full_code ON beopjung_dong(full_code);
-CREATE INDEX IF NOT EXISTS idx_beopjung_dong_boundary ON beopjung_dong USING GIST(boundary);
+-- CREATE INDEX IF NOT EXISTS idx_land_beopjung_dong_code ON land(beopjung_dong_code);
+-- CREATE INDEX IF NOT EXISTS idx_land_boundary ON land USING GIST(boundary);
+-- CREATE INDEX IF NOT EXISTS idx_land_center_point ON land USING GIST(center_point);
+-- CREATE INDEX IF NOT EXISTS idx_land_use_district_code1 ON land(use_district_code1);
+-- CREATE INDEX IF NOT EXISTS idx_beopjeong_dong_full_code ON beopjeong_dong(full_code);
+-- CREATE INDEX IF NOT EXISTS idx_beopjeong_dong_boundary ON beopjeong_dong USING GIST(boundary);
+-- CREATE INDEX IF NOT EXISTS idx_beopjeong_dong_center_point ON beopjeong_dong USING GIST(center_point);
+-- CREATE INDEX IF NOT EXISTS idx_beopjeong_dong_dong_type ON beopjeong_dong(dong_type);

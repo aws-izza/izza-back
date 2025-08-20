@@ -29,6 +29,8 @@ import com.izza.search.vo.PopulationInfo;
 import com.izza.search.vo.UseZoneCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.izza.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +47,17 @@ public class MapSearchService {
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+        
+        if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
+            landSearchFilterRequest = new LandSearchFilterRequest(
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
+            );
+        }
+        
         ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
         if (zoomLevel.equals(ZoomLevel.LAND)) {
             return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
@@ -140,14 +153,14 @@ public class MapSearchService {
             String polygonType,
             String id) {
 
-        if (polygonType.equals("GROUP")) {
+        if (polygonType.equalsIgnoreCase("GROUP")) {
             List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("LAND")) {
+        } else if (polygonType.equalsIgnoreCase("LAND")) {
             List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
             return new PolygonDataResponse(landPolygon);
         } else {
-            throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);
+            throw new BusinessException("유효하지 않은 폴리곤 타입입니다: " + polygonType, HttpStatus.BAD_REQUEST);
         }
 
     }
@@ -155,7 +168,7 @@ public class MapSearchService {
     public LandDetailResponse getLandDataById(String landId) {
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
-            throw new IllegalArgumentException("Land not found with id: " + landId);
+            throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
         }
 
         Land land = landOptional.get();
@@ -194,7 +207,7 @@ public class MapSearchService {
         // first fetch the land of the land from landId
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
-            throw new IllegalArgumentException("Land not found with id: " + landId);
+            throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
         }
 
         // then extract its full_code, converting it to sig_code
@@ -205,7 +218,7 @@ public class MapSearchService {
         // then fetch the area's information using sig_code
         Optional<BeopjungDong> areaOptional = beopjungDongDao.findByFullCode(sig_code);
         if (areaOptional.isEmpty()) {
-            throw new IllegalArgumentException("Area not found with full_code: " + sig_code);
+            throw new BusinessException("행정구역을 찾을 수 없습니다: " + sig_code, HttpStatus.NOT_FOUND);
         }
 
         BeopjungDong area = areaOptional.get();
