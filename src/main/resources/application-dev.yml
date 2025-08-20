@@ -5,8 +5,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
-    # username: ${DB_USERNAME:postgres}
-    # password: ${DB_PASSWORD:defaultpass}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:defaultpass}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10  # Lower for dev

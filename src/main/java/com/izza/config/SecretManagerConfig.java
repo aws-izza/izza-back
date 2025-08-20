@@ -62,6 +62,9 @@ public class SecretManagerConfig implements ApplicationListener<ApplicationEnvir
             
             String username = secretJson.get("username").asText();
             String password = secretJson.get("password").asText();
+
+            log.info("username: " + username); // DEBUG ONLY, DELETE!!!
+            log.info("password: " + password); // DEBUG ONLY, DELETE!!!
             
             // Add the credentials to Spring's environment
             Map<String, Object> secretProperties = new HashMap<>();
