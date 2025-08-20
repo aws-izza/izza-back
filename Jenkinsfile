@@ -115,8 +115,8 @@ spec:
                                                     passwordVariable: 'GIT_PASSWORD')]) {
                         dir('izza-cd') {
                             sh '''
-                                git config user.name "musclefrog"
-                                git config user.email "rlatndls113@gmail.com"
+                                git config user.name "jenkins"
+                                git config user.email "jenkins@company.com"
                             '''
                             
                             sh """
