@@ -7,7 +7,6 @@ import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEven
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.stereotype.Component;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
@@ -16,7 +15,6 @@ import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRespon
 import java.util.HashMap;
 import java.util.Map;
 
-@Component
 @Slf4j
 public class SecretManagerConfig implements ApplicationListener<ApplicationEnvironmentPreparedEvent> {
 
