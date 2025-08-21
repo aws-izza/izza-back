@@ -1,31 +1,26 @@
 spring:
   config:
     activate:
-      on-profile: prod
-    import: aws-secretsmanager:rds!db-83437ad6-f925-4f4d-8340-f10ad49f12e9
-  
-  cloud:
-    aws:
-      region:
-        static: ap-northeast-2
-      credentials:
-        instance-profile: false  # Force use of IRSA instead of instance profile
-        
+      on-profile: dev
+
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
-    username: ${username}
-    password: ${password}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:defaultpass}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 10  # Lower for dev
+      minimum-idle: 2
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
 
-# Add debug logging to see what's happening
-logging:
-  level:
-    io.awspring.cloud.secretsmanager: DEBUG
-    software.amazon.awssdk: DEBUG
-    root: INFO
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
