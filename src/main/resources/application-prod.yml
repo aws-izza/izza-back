@@ -1,7 +1,7 @@
 spring:
   config:
     activate:
-      on-profile: dev
+      on-profile: prod
 
   datasource:
     url: jdbc:postgresql://izza-db.cji28gw0m12f.ap-northeast-2.rds.amazonaws.com:5432/izza
