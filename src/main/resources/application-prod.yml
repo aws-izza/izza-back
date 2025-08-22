@@ -1,3 +1,7 @@
+server:
+  servlet:
+    context-path: /prod/api/v1
+
 spring:
   config:
     activate:
