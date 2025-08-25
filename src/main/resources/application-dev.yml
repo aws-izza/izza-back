@@ -2,6 +2,9 @@ server:
   servlet:
     context-path: /dev
 
+app:
+  base-path: "/dev"
+
 spring:
   config:
     activate:

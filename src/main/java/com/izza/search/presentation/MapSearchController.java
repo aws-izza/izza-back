@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/land-search")
+@RequestMapping("${app.base-path}/api/v1/land-search")
 @RequiredArgsConstructor
 @Tag(name = "토지 검색")
 public class MapSearchController {

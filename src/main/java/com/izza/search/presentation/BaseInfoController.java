@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/base-info")
+@RequestMapping("${app.base-path}/api/v1/base-info")
 @RequiredArgsConstructor
 @Tag(name = "기본 정보")
 public class BaseInfoController {

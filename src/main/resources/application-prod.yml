@@ -2,6 +2,9 @@ server:
   servlet:
     context-path: /prod/api/v1
 
+app:
+  base-path: "/prod"
+
 spring:
   config:
     activate:
