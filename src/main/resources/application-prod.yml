@@ -1,6 +1,6 @@
-server:
-  servlet:
-    context-path: /prod/api/v1
+# server:
+#   servlet:
+#     context-path: /prod/api/v1
 
 app:
   base-path: "/prod"

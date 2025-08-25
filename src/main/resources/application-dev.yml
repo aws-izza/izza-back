@@ -1,6 +1,6 @@
-server:
-  servlet:
-    context-path: /dev
+# server:
+#   servlet:
+#     context-path: /dev
 
 app:
   base-path: "/dev"
