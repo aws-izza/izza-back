@@ -92,6 +92,11 @@ Uses Spring JDBC with custom DAO implementations:
 - Testcontainers with PostGIS for integration testing
 - Connection pooling via HikariCP
 
+### DAO Layer Guidelines
+- **No null checks in DAO**: All null validation should be performed in Service layer
+- **Use indexed queries**: Prefer `LEFT(column, length)` over `LIKE column%` for better index utilization
+- **Avoid WHERE 1=1**: Start with meaningful WHERE conditions for better query optimization
+
 ### API Structure
 REST endpoints in `com.izza.search.presentation`:
 - `MapSearchController`: Geographic search and polygon retrieval

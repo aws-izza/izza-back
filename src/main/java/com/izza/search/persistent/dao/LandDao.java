@@ -2,6 +2,7 @@ package com.izza.search.persistent.dao;
 
 import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.dto.query.CountLandQuery;
+import com.izza.search.persistent.dto.query.FullCodeLandSearchQuery;
 import com.izza.search.persistent.dto.query.LandSearchQuery;
 import com.izza.search.persistent.model.Land;
 import com.izza.utils.GisUtils;
@@ -146,6 +147,41 @@ public class LandDao {
             long max = rs.getLong("max_area");
             return new LongRangeDto(min, max);
         });
+    }
+    
+    /**
+     * fullCode와 범위 조건으로 토지 목록 조회
+     */
+    public List<Land> findLandsByFullCode(FullCodeLandSearchQuery query) {
+        int fullCodeLength = query.fullCode().length();
+        String leftQuery = "LEFT(full_code, " + fullCodeLength + ") = ? ";
+        
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT *, ")
+           .append("ST_AsText(boundary) as boundary_wkt, ")
+           .append("ST_X(center_point) as center_lng, ")
+           .append("ST_Y(center_point) as center_lat ")
+           .append("FROM land WHERE ").append(leftQuery);
+
+        List<Object> params = new ArrayList<>();
+        params.add(query.fullCode());
+
+        // 토지 면적 필터
+        SqlConditionUtils.between(sql, params,
+                "land_area",
+                BigDecimal.valueOf(query.landAreaMin()),
+                BigDecimal.valueOf(query.landAreaMax()));
+
+        // 공시지가 필터
+        SqlConditionUtils.between(sql, params,
+                "official_land_price",
+                BigDecimal.valueOf(query.officialLandPriceMin()),
+                BigDecimal.valueOf(query.officialLandPriceMax()));
+
+        // 용도지역 필터
+        SqlConditionUtils.in(sql, params, "use_district_code1", query.useZoneCategories());
+
+        return jdbcTemplate.query(sql.toString(), new LandRowMapper(), params.toArray());
     }
 
 

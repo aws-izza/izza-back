@@ -67,6 +67,6 @@ public class MapSearchController {
     public BaseApiResponse<AreaDetailResponse> getAreaDetails(
             @PathVariable("landId") String landId
     ) {
-        return BaseApiResponse.ok(mapSearchService.getAreaDetails(landId));
+        return BaseApiResponse.ok(mapSearchService.getAreaDetailsByLandId(landId));
     }
 }
