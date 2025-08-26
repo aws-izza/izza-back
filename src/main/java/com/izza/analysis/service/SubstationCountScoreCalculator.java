@@ -11,30 +11,18 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
-public class SubstationCountScoreCalculator implements ScoreCalculator {
-    
-    private static final double BASE_SCORE = 0.5;
+public class SubstationCountScoreCalculator extends AbstractNormalizedScoreCalculator {
     
     @Override
-    public double calculateScore(LandAnalysisData request) {
-        int substationCount = request.getSubstationCount();
-        var statisticsRange = request.getStatisticsRanges().get(AnalysisStatisticsType.SUBSTATION_COUNT);
-        
-        long min = statisticsRange.min();
-        long max = statisticsRange.max();
-        
-        if (max == min) {
-            return BASE_SCORE;
-        }
-        
-        // 정규화 점수 계산: 변전소가 많을수록 높은 점수
-        // base_score + (x - min) / (max - min) * (1 - base_score)
-        double score = BASE_SCORE + (substationCount - min) / (double)(max - min) * (1 - BASE_SCORE);
-        
-        // 0~1 범위로 제한
-        return Math.max(0.0, Math.min(1.0, score));
+    protected double getActualValue(LandAnalysisData data) {
+        return data.getSubstationCount();
     }
-    
+
+    @Override
+    protected double getBaseScore() {
+        return 0;
+    }
+
     @Override
     public AnalysisStatisticsType getStatisticsType() {
         return AnalysisStatisticsType.SUBSTATION_COUNT;

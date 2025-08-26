@@ -6,6 +6,7 @@ import com.izza.analysis.presentation.dto.response.LandScoreRankingResponse;
 import com.izza.analysis.persistent.dao.LandPowerInfrastructureSummaryDao;
 import com.izza.analysis.persistent.model.LandPowerInfrastructureSummary;
 import com.izza.analysis.service.dto.LandAnalysisData;
+import com.izza.analysis.service.dto.ScoreResult;
 import com.izza.analysis.vo.AnalysisStatisticsType;
 import com.izza.analysis.vo.WeightedStatisticsRange;
 import com.izza.search.persistent.model.Land;
@@ -30,6 +31,7 @@ public class LandAnalysisService {
     private final MapSearchService mapSearchService;
     private final LandPowerInfrastructureSummaryDao powerInfrastructureDao;
     private final List<ScoreCalculator> scoreCalculators;
+    private final WeightCalculator weightCalculator;
 
     /**
      * 토지 분석을 수행 (fullCode 기반 다중 토지 분석만 지원)
@@ -62,10 +64,16 @@ public class LandAnalysisService {
         // 2. 행정구역 상세 정보 조회 (한 번만)
         AreaDetailResponse areaDetails = mapSearchService.getAreaDetailsByFullCode(fullCode);
 
-        // 3. 각 토지별 점수 계산
-        List<LandScoreItem> landScoreItems = new ArrayList<>();
+        // 3. 가중치 맵 미리 계산
         Map<AnalysisStatisticsType, WeightedStatisticsRange> statisticsRanges =
                 convertToStatisticsRangeMap(request);
+        Map<AnalysisStatisticsType, Double> categoryNormalizedWeights = 
+                weightCalculator.createCategoryNormalizedWeights(statisticsRanges);
+        Map<AnalysisStatisticsType, Double> globalNormalizedWeights = 
+                weightCalculator.createGlobalNormalizedWeights(statisticsRanges);
+
+        // 4. 각 토지별 점수 계산
+        List<LandScoreItem> landScoreItems = new ArrayList<>();
 
         for (Land land : lands) {
             // 전력 인프라 정보 조회
@@ -81,12 +89,14 @@ public class LandAnalysisService {
                     .transmissionTowerCount(powerInfraSummary.getTransmissionTowerCount())
                     .transmissionLineCount(powerInfraSummary.getTransmissionLineCount())
                     .statisticsRanges(statisticsRanges)
+                    .categoryNormalizedWeights(categoryNormalizedWeights)
+                    .globalNormalizedWeights(globalNormalizedWeights)
                     .targetUseDistrictCodes(request.getTargetUseDistrictCodes())
                     .build();
 
             // 점수 계산
-            Map<AnalysisStatisticsType, Double> scores = calculateScores(analysisData);
-            double totalScore = calculateTotalScore(scores);
+            Map<AnalysisStatisticsType, ScoreResult> scoreResults = calculateScores(analysisData);
+            double totalScore = calculateTotalScoreFromResults(scoreResults, analysisData);
 
             // LandScoreItem 생성
             LandScoreItem item = LandScoreItem.builder()
@@ -95,16 +105,17 @@ public class LandAnalysisService {
                     .landArea(land.getLandArea())
                     .officialLandPrice(land.getOfficialLandPrice())
                     .totalScore(totalScore)
-                    .categoryScores(convertToCategoryScoreDetails(scores))
+                    .categoryScores(convertToCategoryScoreDetails(scoreResults))
+                    .globalScores(convertToGlobalScoreDetails(scoreResults))
                     .build();
 
             landScoreItems.add(item);
         }
 
-        // 4. 점수 내림차순 정렬
+        // 5. 점수 내림차순 정렬
         landScoreItems.sort((a, b) -> Double.compare(b.getTotalScore(), a.getTotalScore()));
 
-        // 5. 응답 객체 구성
+        // 6. 응답 객체 구성
         return LandScoreRankingResponse.builder()
                 .landScores(landScoreItems)
                 .build();
@@ -136,50 +147,61 @@ public class LandAnalysisService {
     /**
      * 점수 계산 (모든 ScoreCalculator 구현체 순회하여 계산)
      */
-    private Map<AnalysisStatisticsType, Double> calculateScores(LandAnalysisData analysisData) {
-        Map<AnalysisStatisticsType, Double> scores = new HashMap<>();
+    private Map<AnalysisStatisticsType, ScoreResult> calculateScores(LandAnalysisData analysisData) {
+        Map<AnalysisStatisticsType, ScoreResult> scoreResults = new HashMap<>();
 
         // 모든 ScoreCalculator 구현체를 순회하면서 점수 계산
         for (ScoreCalculator calculator : scoreCalculators) {
             try {
-                double score = calculator.calculateScore(analysisData);
-                AnalysisStatisticsType statisticsType = calculator.getStatisticsType();
-                scores.put(statisticsType, score);
+                ScoreResult scoreResult = calculator.calculateScore(analysisData);
+                AnalysisStatisticsType statisticsType = scoreResult.getStatisticsType();
+                scoreResults.put(statisticsType, scoreResult);
 
-                log.debug("점수 계산 완료. calculator: {}, type: {}, score: {}",
-                        calculator.getCalculatorName(), statisticsType, score);
+                log.debug("점수 계산 완료. calculator: {}, type: {}, original: {}, categoryNormalized: {}, globalNormalized: {}",
+                        calculator.getCalculatorName(), 
+                        statisticsType, 
+                        scoreResult.getOriginalScore(),
+                        scoreResult.getCategoryNormalizedScore(),
+                        scoreResult.getGlobalNormalizedScore());
 
             } catch (Exception e) {
                 log.error("점수 계산 중 오류 발생. calculator: {}, landId: {}",
                         calculator.getCalculatorName(), analysisData.getLand().getId(), e);
                 // 오류 발생 시 해당 계산기 점수는 0으로 설정
-                scores.put(calculator.getStatisticsType(), 0.0);
+                AnalysisStatisticsType statisticsType = calculator.getStatisticsType();
+                ScoreResult errorResult = ScoreResult.builder()
+                        .statisticsType(statisticsType)
+                        .originalScore(0.0)
+                        .categoryNormalizedScore(0.0)
+                        .globalNormalizedScore(0.0)
+                        .build();
+                scoreResults.put(statisticsType, errorResult);
             }
         }
 
-        log.debug("전체 점수 계산 완료. landId: {}, scores: {}",
-                analysisData.getLand().getId(), scores);
+        log.debug("전체 점수 계산 완료. landId: {}, scoreResults count: {}",
+                analysisData.getLand().getId(), scoreResults.size());
 
-        return scores;
+        return scoreResults;
     }
 
     /**
-     * 총합 점수 계산 (가중치 적용)
+     * ScoreResult에서 총합 점수 계산 (미리 계산된 가중치 적용)
      */
-    private double calculateTotalScore(Map<AnalysisStatisticsType, Double> scores) {
-        if (scores.isEmpty()) {
+    private double calculateTotalScoreFromResults(Map<AnalysisStatisticsType, ScoreResult> scoreResults, LandAnalysisData analysisData) {
+        if (scoreResults.isEmpty()) {
             return 0.0;
         }
 
-        // 단순 평균 계산 (향후 가중치 적용 가능)
-        double totalScore = scores.values().stream()
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .orElse(0.0);
+        // 원본 점수 추출하여 최종 점수 계산
+        Map<AnalysisStatisticsType, Double> originalScores = new HashMap<>();
+        for (Map.Entry<AnalysisStatisticsType, ScoreResult> entry : scoreResults.entrySet()) {
+            originalScores.put(entry.getKey(), entry.getValue().getOriginalScore());
+        }
 
-        // 0~1 범위로 제한
-        return Math.max(0.0, Math.min(1.0, totalScore));
+        return weightCalculator.calculateFinalWeightedScore(originalScores, analysisData.getGlobalNormalizedWeights());
     }
+
 
 
     /**
@@ -197,7 +219,7 @@ public class LandAnalysisService {
         Map<AnalysisStatisticsType, WeightedStatisticsRange> map = new HashMap<>();
 
         map.put(AnalysisStatisticsType.LAND_AREA, request.getLandAreaRange());
-        map.put(AnalysisStatisticsType.LAND_PRICE, request.getLandPriceRange());
+        map.put(AnalysisStatisticsType.OFFICIAL_LAND_PRICE, request.getLandPriceRange());
         map.put(AnalysisStatisticsType.ELECTRICITY_COST, request.getElectricityCostRange());
         map.put(AnalysisStatisticsType.SUBSTATION_COUNT, request.getSubstationCountRange());
         map.put(AnalysisStatisticsType.TRANSMISSION_TOWER_COUNT, request.getTransmissionTowerCountRange());
@@ -209,22 +231,24 @@ public class LandAnalysisService {
     }
 
     /**
-     * Map<AnalysisStatisticsType, Double> 점수를 CategoryScoreDetail 목록으로 변환
+     * ScoreResult를 사용하여 CategoryScoreDetail 목록으로 변환
+     * 카테고리 내 가중치가 적용된 점수를 사용 (categoryNormalizedScore)
      */
     private List<LandScoreItem.CategoryScoreDetail> convertToCategoryScoreDetails(
-            Map<AnalysisStatisticsType, Double> scores) {
+            Map<AnalysisStatisticsType, ScoreResult> scoreResults) {
 
         Map<AnalysisStatisticsType.AnalysisCategory, List<AnalysisStatisticsType>> categoryGroups = new HashMap<>();
         Map<AnalysisStatisticsType.AnalysisCategory, Double> categoryTotalScores = new HashMap<>();
 
-        // 카테고리별로 그룹화 및 총점 계산
-        for (Map.Entry<AnalysisStatisticsType, Double> entry : scores.entrySet()) {
+        // 카테고리별로 그룹화 및 총점 계산 (카테고리 정규화 점수 사용)
+        for (Map.Entry<AnalysisStatisticsType, ScoreResult> entry : scoreResults.entrySet()) {
             AnalysisStatisticsType type = entry.getKey();
-            Double score = entry.getValue();
+            ScoreResult scoreResult = entry.getValue();
+            Double categoryNormalizedScore = scoreResult.getCategoryNormalizedScore();
             AnalysisStatisticsType.AnalysisCategory category = type.getCategory();
 
             categoryGroups.computeIfAbsent(category, k -> new ArrayList<>()).add(type);
-            categoryTotalScores.merge(category, score, Double::sum);
+            categoryTotalScores.merge(category, categoryNormalizedScore, Double::sum);
         }
 
         // CategoryScoreDetail 목록 생성
@@ -236,17 +260,17 @@ public class LandAnalysisService {
                 continue;
             }
 
-            // 카테고리 평균 점수 계산
-            double categoryAvgScore = categoryTotalScores.get(category) / typesInCategory.size();
+            // 카테고리별 총점 (가중치 적용된 점수 합계)
+            double categoryTotalScore = categoryTotalScores.get(category);
 
-            // TypeScoreDetail 목록 생성
+            // TypeScoreDetail 목록 생성 (카테고리 정규화 점수 사용)
             List<LandScoreItem.TypeScoreDetail> typeScoreDetails = new ArrayList<>();
             for (AnalysisStatisticsType type : typesInCategory) {
-                Double score = scores.get(type);
-                if (score != null) {
+                ScoreResult scoreResult = scoreResults.get(type);
+                if (scoreResult != null) {
                     typeScoreDetails.add(LandScoreItem.TypeScoreDetail.builder()
                             .typeName(type.getDisplayName())
-                            .score(score)
+                            .score(scoreResult.getCategoryNormalizedScore()) // 카테고리 내 가중치 적용 점수
                             .build());
                 }
             }
@@ -254,7 +278,7 @@ public class LandAnalysisService {
             // CategoryScoreDetail 생성
             categoryScoreDetails.add(LandScoreItem.CategoryScoreDetail.builder()
                     .categoryName(category.getDisplayName())
-                    .totalScore(categoryAvgScore)
+                    .totalScore(categoryTotalScore) // 카테고리별 가중치 적용 총점
                     .typeScores(typeScoreDetails)
                     .build());
         }
@@ -263,4 +287,59 @@ public class LandAnalysisService {
     }
 
 
+    /**
+     * ScoreResult를 사용하여 전역 정규화 점수를 CategoryScoreDetail 목록으로 변환
+     * 전체 점수 대비 각 카테고리/타입의 기여도를 계산
+     */
+    private List<LandScoreItem.CategoryScoreDetail> convertToGlobalScoreDetails(
+            Map<AnalysisStatisticsType, ScoreResult> scoreResults) {
+
+        Map<AnalysisStatisticsType.AnalysisCategory, List<AnalysisStatisticsType>> categoryGroups = new HashMap<>();
+        Map<AnalysisStatisticsType.AnalysisCategory, Double> categoryTotalScores = new HashMap<>();
+
+        // 카테고리별로 그룹화 및 총점 계산 (전역 정규화된 점수 사용)
+        for (Map.Entry<AnalysisStatisticsType, ScoreResult> entry : scoreResults.entrySet()) {
+            AnalysisStatisticsType type = entry.getKey();
+            ScoreResult scoreResult = entry.getValue();
+            Double globalScore = scoreResult.getGlobalNormalizedScore();
+            AnalysisStatisticsType.AnalysisCategory category = type.getCategory();
+
+            categoryGroups.computeIfAbsent(category, k -> new ArrayList<>()).add(type);
+            categoryTotalScores.merge(category, globalScore, Double::sum);
+        }
+
+        // CategoryScoreDetail 목록 생성
+        List<LandScoreItem.CategoryScoreDetail> globalCategoryScoreDetails = new ArrayList<>();
+
+        for (AnalysisStatisticsType.AnalysisCategory category : AnalysisStatisticsType.AnalysisCategory.values()) {
+            List<AnalysisStatisticsType> typesInCategory = categoryGroups.get(category);
+            if (typesInCategory == null || typesInCategory.isEmpty()) {
+                continue;
+            }
+
+            // 카테고리별 전역 점수 합계
+            double categoryGlobalScore = categoryTotalScores.get(category);
+
+            // TypeScoreDetail 목록 생성 (전역 정규화 점수 사용)
+            List<LandScoreItem.TypeScoreDetail> typeScoreDetails = new ArrayList<>();
+            for (AnalysisStatisticsType type : typesInCategory) {
+                ScoreResult scoreResult = scoreResults.get(type);
+                if (scoreResult != null) {
+                    typeScoreDetails.add(LandScoreItem.TypeScoreDetail.builder()
+                            .typeName(type.getDisplayName())
+                            .score(scoreResult.getGlobalNormalizedScore())  // 전역 정규화된 점수 (가중치 적용된 실제 기여분)
+                            .build());
+                }
+            }
+
+            // CategoryScoreDetail 생성
+            globalCategoryScoreDetails.add(LandScoreItem.CategoryScoreDetail.builder()
+                    .categoryName(category.getDisplayName())
+                    .totalScore(categoryGlobalScore)  // 카테고리별 전역 점수 합계
+                    .typeScores(typeScoreDetails)
+                    .build());
+        }
+
+        return globalCategoryScoreDetails;
+    }
 }

@@ -40,6 +40,12 @@ public class LandAnalysisData {
     // 통계 범위 정보 (통계 유형별 min/max 값과 가중치)
     private Map<AnalysisStatisticsType, WeightedStatisticsRange> statisticsRanges;
     
+    // 카테고리별 정규화된 가중치 (카테고리 내에서 100% 기준)
+    private Map<AnalysisStatisticsType, Double> categoryNormalizedWeights;
+    
+    // 전체 정규화된 가중치 (전체에서 100% 기준)
+    private Map<AnalysisStatisticsType, Double> globalNormalizedWeights;
+    
     // 용도지역 필터 조건
     private List<String> targetUseDistrictCodes;
     

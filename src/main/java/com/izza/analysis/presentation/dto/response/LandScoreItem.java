@@ -32,6 +32,9 @@ public class LandScoreItem {
     
     @Schema(description = "카테고리별 점수")
     private List<CategoryScoreDetail> categoryScores;
+
+    @Schema(description = "총합 점수 기준 카테고리별 점수")
+    private List<CategoryScoreDetail> globalScores;
     
     @Schema(description = "순위 (1부터 시작)")
     private int rank;

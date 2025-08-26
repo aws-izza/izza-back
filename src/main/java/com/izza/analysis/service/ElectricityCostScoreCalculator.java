@@ -5,24 +5,24 @@ import com.izza.analysis.service.dto.LandAnalysisData;
 import org.springframework.stereotype.Component;
 
 /**
- * 전기선 개수 점수 계산기
- * 전기선이 많을수록 높은 점수 (전력 인프라 충실성 향상)
+ * 전기요금 점수 계산기
+ * 전기요금이 클수록 높은 점수 (기준 점수 0.5)
  */
 @Component
-public class TransmissionLineCountScoreCalculator extends AbstractNormalizedScoreCalculator {
+public class ElectricityCostScoreCalculator extends AbstractNormalizedScoreCalculator {
     
     @Override
     protected double getActualValue(LandAnalysisData data) {
-        return data.getTransmissionLineCount();
+        return data.getElectricityCostInfo().unitCost().doubleValue();
     }
 
     @Override
     protected double getBaseScore() {
-        return 0;
+        return 0.5;
     }
 
     @Override
     public AnalysisStatisticsType getStatisticsType() {
-        return AnalysisStatisticsType.TRANSMISSION_LINE_COUNT;
+        return AnalysisStatisticsType.ELECTRICITY_COST;
     }
 }

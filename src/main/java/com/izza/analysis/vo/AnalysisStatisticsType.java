@@ -12,7 +12,7 @@ public enum AnalysisStatisticsType {
     LAND_AREA(AnalysisCategory.LOCATION_CONDITION, "토지면적"),
     
     /** 공시지가 통계 (원/㎡) */
-    LAND_PRICE(AnalysisCategory.LOCATION_CONDITION, "공시지가"), 
+    OFFICIAL_LAND_PRICE(AnalysisCategory.LOCATION_CONDITION, "공시지가"),
     
     /** 용도지역 통계 */
     USE_DISTRICT(AnalysisCategory.LOCATION_CONDITION, "용도지역"),
