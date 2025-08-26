@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,34 +66,49 @@ public class ElectricityCostDao {
     /**
      * 전체 전기 요금 데이터에서 최소 단위 요금 조회
      */
-    public Optional<BigDecimal> findMinUnitCost() {
+    public Optional<BigDecimal> findMinUnitCost(String fullCode) {
         String sql = """
                 SELECT MIN("unitCost") as min_unit_cost
                 FROM electricity
-                WHERE "unitCost" IS NOT NULL
+                WHERE full_code = ? 
+                  AND "unitCost" IS NOT NULL
                 """;
 
-        List<BigDecimal> results = jdbcTemplate.query(sql,
-                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "min_unit_cost").orElse(null));
+        List<Object> params = new ArrayList<>();
+        params.add(fullCode);
 
-        return results.isEmpty() || results.get(0) == null ? Optional.empty() : Optional.of(results.get(0));
+        BigDecimal result = jdbcTemplate.queryForObject(
+                sql,
+                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "min_unit_cost").orElse(null),
+                params
+        );
+
+        return Optional.ofNullable(result);
     }
 
     /**
      * 전체 전기 요금 데이터에서 최대 단위 요금 조회
      */
-    public Optional<BigDecimal> findMaxUnitCost() {
+    public Optional<BigDecimal> findMaxUnitCost(String fullCode) {
         String sql = """
                 SELECT MAX("unitCost") as max_unit_cost
                 FROM electricity
-                WHERE "unitCost" IS NOT NULL
+                WHERE full_code LIKE ? \s
+                  AND "unitCost" IS NOT NULL
                 """;
 
-        List<BigDecimal> results = jdbcTemplate.query(sql,
-                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "max_unit_cost").orElse(null));
+        List<Object> params = new ArrayList<>();
+        params.add(fullCode);
 
-        return results.isEmpty() || results.get(0) == null ? Optional.empty() : Optional.of(results.get(0));
+        BigDecimal result = jdbcTemplate.queryForObject(
+                sql,
+                (rs, rowNum) -> ResultSetUtils.getBigDecimalSafe(rs, "max_unit_cost").orElse(null),
+                params
+        );
+
+        return Optional.ofNullable(result);
     }
+
 
     /**
      * 전기 요금 정보 RowMapper

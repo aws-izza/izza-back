@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
@@ -36,6 +37,14 @@ public class BaseInfoController {
     public BaseApiResponse<LongRangeDto> getOfficialLandPriceRange() {
         return BaseApiResponse.ok(landDataRangeService.getOfficialLandPriceRange());
     }
+
+    @GetMapping("/electric-bill-range")
+    @Operation(summary = "전기요금 범위 조회",
+            description = "전체 토지의 전기요금 최소값과 최대값을 조회합니다.")
+    public BaseApiResponse<LongRangeDto> getElectricBillRange(@RequestParam(required = false) String fullCode) {
+        return BaseApiResponse.ok(landDataRangeService.getElectricBillRange(fullCode));
+    }
+
 
     @GetMapping("/use-zone-categories")
     @Operation(summary = "기업 적합 용도지역 카테고리 조회", 

@@ -1,6 +1,7 @@
 package com.izza.analysis.service.dto;
 
 import com.izza.analysis.vo.AnalysisStatisticsType;
+import com.izza.analysis.vo.IndustryType;
 import com.izza.analysis.vo.WeightedStatisticsRange;
 import com.izza.search.persistent.model.Land;
 import com.izza.search.vo.ElectricityCostInfo;
@@ -48,5 +49,8 @@ public class LandAnalysisData {
     
     // 용도지역 필터 조건
     private List<String> targetUseDistrictCodes;
+    
+    // 산업 업종 타입 (인구밀도 계산용)
+    private IndustryType industryType;
     
 }

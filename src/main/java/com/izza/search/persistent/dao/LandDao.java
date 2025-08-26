@@ -181,6 +181,8 @@ public class LandDao {
         // 용도지역 필터
         SqlConditionUtils.in(sql, params, "use_district_code1", query.useZoneCategories());
 
+        sql.append(" LIMIT 500");
+
         return jdbcTemplate.query(sql.toString(), new LandRowMapper(), params.toArray());
     }
 

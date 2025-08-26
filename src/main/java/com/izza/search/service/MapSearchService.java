@@ -230,7 +230,7 @@ public class MapSearchService {
         String address = area.getKoreanName();
 
         // then fetch electricity cost
-        ElectricityCost electricityCost = electricityCostDao.findAllByFullCode(sigCode).get(0);
+        ElectricityCost electricityCost = electricityCostDao.findByFullCode(sigCode).orElse(null);
         ElectricityCostInfo costInfo = ElectricityCostInfo.of(electricityCost);
 
         // then fetch emergency texts
@@ -253,6 +253,8 @@ public class MapSearchService {
      * @return 조건에 맞는 토지 목록
      */
     public List<Land> findLandsByFullCodeAndFilter(String fullCode, LandSearchFilterRequest landSearchFilterRequest) {
+        String sigCode = fullCode.substring(0, 5);
+
         // 용도지역 카테고리가 없으면 기본값 설정
         if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
             landSearchFilterRequest = new LandSearchFilterRequest(
@@ -263,13 +265,14 @@ public class MapSearchService {
                     List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
             );
         }
-        
+
+
         // 용도지역 카테고리를 코드로 변환
         List<Integer> useZoneIds = UseZoneCode.convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
         
         // fullCode 기반 토지 검색을 위한 쿼리 생성
         FullCodeLandSearchQuery query = new FullCodeLandSearchQuery(
-                fullCode,
+                sigCode,
                 landSearchFilterRequest.landAreaMin(),
                 landSearchFilterRequest.landAreaMax(),
                 landSearchFilterRequest.officialLandPriceMin(),

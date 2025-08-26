@@ -16,7 +16,7 @@ import java.util.List;
 @Schema(description = "토지 분석 요청")
 public class LandAnalysisRequest {
     
-    @Schema(description = "법정동 코드", example = "1100000000")
+    @Schema(description = "법정동 코드", example = "11000000")
     private String fullCode;
     
     @Schema(description = "토지 면적 통계 범위")
@@ -42,6 +42,9 @@ public class LandAnalysisRequest {
 
     @Schema(description = "재해 발생 통계 범위")
     private WeightedStatisticsRange disasterCountRange;
+    
+    @Schema(description = "산업 업종 타입 (인구밀도 계산용)", example = "MANUFACTURING", allowableValues = {"MANUFACTURING", "LOGISTICS", "IT"})
+    private String industryType;
     
     @Schema(description = "용도지역 필터 조건 (매칭되는 카테고리 목록)", example = "[\"COMMERCIAL\", \"INDUSTRIAL\"]")
     private List<String> targetUseDistrictCodes;

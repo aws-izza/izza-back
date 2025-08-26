@@ -1,13 +1,16 @@
 package com.izza.analysis.service;
 
+import com.izza.analysis.presentation.dto.AnalysisRangeDto;
 import com.izza.analysis.presentation.dto.request.LandAnalysisRequest;
 import com.izza.analysis.presentation.dto.response.LandScoreItem;
 import com.izza.analysis.presentation.dto.response.LandScoreRankingResponse;
 import com.izza.analysis.persistent.dao.LandPowerInfrastructureSummaryDao;
 import com.izza.analysis.persistent.model.LandPowerInfrastructureSummary;
+import com.izza.analysis.service.adapter.LandDataRangeAdapter;
 import com.izza.analysis.service.dto.LandAnalysisData;
 import com.izza.analysis.service.dto.ScoreResult;
 import com.izza.analysis.vo.AnalysisStatisticsType;
+import com.izza.analysis.vo.IndustryType;
 import com.izza.analysis.vo.WeightedStatisticsRange;
 import com.izza.search.persistent.model.Land;
 import com.izza.search.service.MapSearchService;
@@ -32,6 +35,7 @@ public class LandAnalysisService {
     private final LandPowerInfrastructureSummaryDao powerInfrastructureDao;
     private final List<ScoreCalculator> scoreCalculators;
     private final WeightCalculator weightCalculator;
+    private final LandDataRangeAdapter landDataRangeAdapter;
 
     /**
      * 토지 분석을 수행 (fullCode 기반 다중 토지 분석만 지원)
@@ -67,9 +71,9 @@ public class LandAnalysisService {
         // 3. 가중치 맵 미리 계산
         Map<AnalysisStatisticsType, WeightedStatisticsRange> statisticsRanges =
                 convertToStatisticsRangeMap(request);
-        Map<AnalysisStatisticsType, Double> categoryNormalizedWeights = 
+        Map<AnalysisStatisticsType, Double> categoryNormalizedWeights =
                 weightCalculator.createCategoryNormalizedWeights(statisticsRanges);
-        Map<AnalysisStatisticsType, Double> globalNormalizedWeights = 
+        Map<AnalysisStatisticsType, Double> globalNormalizedWeights =
                 weightCalculator.createGlobalNormalizedWeights(statisticsRanges);
 
         // 4. 각 토지별 점수 계산
@@ -92,6 +96,7 @@ public class LandAnalysisService {
                     .categoryNormalizedWeights(categoryNormalizedWeights)
                     .globalNormalizedWeights(globalNormalizedWeights)
                     .targetUseDistrictCodes(request.getTargetUseDistrictCodes())
+                    .industryType(IndustryType.fromCode(request.getIndustryType()))
                     .build();
 
             // 점수 계산
@@ -158,8 +163,8 @@ public class LandAnalysisService {
                 scoreResults.put(statisticsType, scoreResult);
 
                 log.debug("점수 계산 완료. calculator: {}, type: {}, original: {}, categoryNormalized: {}, globalNormalized: {}",
-                        calculator.getCalculatorName(), 
-                        statisticsType, 
+                        calculator.getCalculatorName(),
+                        statisticsType,
                         scoreResult.getOriginalScore(),
                         scoreResult.getCategoryNormalizedScore(),
                         scoreResult.getGlobalNormalizedScore());
@@ -203,7 +208,6 @@ public class LandAnalysisService {
     }
 
 
-
     /**
      * 전력 인프라 정보 조회
      */
@@ -221,13 +225,28 @@ public class LandAnalysisService {
         map.put(AnalysisStatisticsType.LAND_AREA, request.getLandAreaRange());
         map.put(AnalysisStatisticsType.OFFICIAL_LAND_PRICE, request.getLandPriceRange());
         map.put(AnalysisStatisticsType.ELECTRICITY_COST, request.getElectricityCostRange());
-        map.put(AnalysisStatisticsType.SUBSTATION_COUNT, request.getSubstationCountRange());
-        map.put(AnalysisStatisticsType.TRANSMISSION_TOWER_COUNT, request.getTransmissionTowerCountRange());
-        map.put(AnalysisStatisticsType.TRANSMISSION_LINE_COUNT, request.getTransmissionLineCountRange());
-        map.put(AnalysisStatisticsType.POPULATION_DENSITY, request.getPopulationDensityRange());
-        map.put(AnalysisStatisticsType.DISASTER_COUNT, request.getDisasterCountRange());
+
+
+        // 선택 지표들은 사용자 요청에 없을 경우 어댑터를 통해 기본값 조회
+        map.put(AnalysisStatisticsType.SUBSTATION_COUNT,
+                convertToWeightedRange(request.getSubstationCountRange(), landDataRangeAdapter.getSubstationCountRange()));
+        map.put(AnalysisStatisticsType.TRANSMISSION_TOWER_COUNT,
+                convertToWeightedRange(request.getTransmissionTowerCountRange(), landDataRangeAdapter.getTransmissionTowerCountRange()));
+        map.put(AnalysisStatisticsType.TRANSMISSION_LINE_COUNT,
+                convertToWeightedRange(request.getTransmissionLineCountRange(), landDataRangeAdapter.getTransmissionLineCountRange()));
+        map.put(AnalysisStatisticsType.DISASTER_COUNT,
+                convertToWeightedRange(request.getDisasterCountRange(), landDataRangeAdapter.getDisasterCountRange()));
 
         return map;
+    }
+
+
+    private WeightedStatisticsRange convertToWeightedRange(WeightedStatisticsRange origin, AnalysisRangeDto rangeDto) {
+        return WeightedStatisticsRange.builder()
+                .min(rangeDto.min())
+                .max(rangeDto.max())
+                .weight(origin.weight())
+                .build();
     }
 
     /**
