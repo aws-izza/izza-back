@@ -3,7 +3,9 @@ package com.izza.search.persistent.model;
 import com.izza.search.vo.LandCategoryCode;
 import com.izza.search.vo.UseDistrictCode;
 import com.izza.search.vo.Point;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,6 +15,8 @@ import java.util.List;
  * 토지대장 DTO
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Land {
 
     private Long id;
@@ -74,9 +78,7 @@ public class Land {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
-    // 기본 생성자
-    public Land() {}
-    
+
     /**
      * 지목코드를 enum으로 반환
      */
@@ -86,42 +88,7 @@ public class Land {
         }
         return LandCategoryCode.fromCode(landCategoryCode.intValue());
     }
-    
-    /**
-     * 지목 설명 반환
-     */
-    public String getLandCategoryDescription() {
-        return getLandCategory().getDescription();
-    }
 
-    /**
-     * 농업용 토지인지 확인
-     */
-    public boolean isAgriculturalLand() {
-        return getLandCategory().isAgricultural();
-    }
-    
-    /**
-     * 건축 가능한 토지인지 확인
-     */
-    public boolean isBuildableLand() {
-        return getLandCategory().isBuildable();
-    }
-    
-    /**
-     * 공공시설 토지인지 확인
-     */
-    public boolean isPublicFacilityLand() {
-        return getLandCategory().isPublicFacility();
-    }
-    
-    /**
-     * 수자원 관련 토지인지 확인
-     */
-    public boolean isWaterRelatedLand() {
-        return getLandCategory().isWaterRelated();
-    }
-    
     /**
      * 첫 번째 용도지구코드를 enum으로 반환
      */
@@ -140,83 +107,5 @@ public class Land {
             return UseDistrictCode.UNSPECIFIED;
         }
         return UseDistrictCode.fromCode(useDistrictCode2.intValue());
-    }
-    
-    /**
-     * 첫 번째 용도지구 설명 반환
-     */
-    public String getUseDistrict1Description() {
-        return getUseDistrict1().getDescription();
-    }
-    
-    /**
-     * 두 번째 용도지구 설명 반환
-     */
-    public String getUseDistrict2Description() {
-        return getUseDistrict2().getDescription();
-    }
-    
-    /**
-     * 개발진흥지구에 속하는지 확인
-     */
-    public boolean isDevelopmentDistrict() {
-        return getUseDistrict1().isDevelopmentDistrict() || getUseDistrict2().isDevelopmentDistrict();
-    }
-    
-    /**
-     * 보호지구에 속하는지 확인
-     */
-    public boolean isProtectionDistrict() {
-        return getUseDistrict1().isProtectionDistrict() || getUseDistrict2().isProtectionDistrict();
-    }
-    
-    /**
-     * 경관지구에 속하는지 확인
-     */
-    public boolean isLandscapeDistrict() {
-        return getUseDistrict1().isLandscapeDistrict() || getUseDistrict2().isLandscapeDistrict();
-    }
-    
-    /**
-     * 건축 제한이 있는 용도지구인지 확인
-     */
-    public boolean hasConstructionRestrictionByDistrict() {
-        return getUseDistrict1().hasConstructionRestriction() || getUseDistrict2().hasConstructionRestriction();
-    }
-
-    @Override
-    public String toString() {
-        return "LandDto{" +
-                "id=" + id +
-                ", shapeId=" + shapeId +
-                ", uniqueNo='" + uniqueNo + '\'' +
-                ", fullCodePrefixes='" + beopjungDongCode + '\'' +
-                ", address='" + address + '\'' +
-                ", ledgerDivisionCode=" + ledgerDivisionCode +
-                ", ledgerDivisionName='" + ledgerDivisionName + '\'' +
-                ", baseYear=" + baseYear +
-                ", baseMonth=" + baseMonth +
-                ", landCategoryCode=" + landCategoryCode +
-                ", landCategoryName='" + landCategoryName + '\'' +
-                ", landArea=" + landArea +
-                ", useDistrictCode1=" + useDistrictCode1 +
-                ", useDistrictName1='" + useDistrictName1 + '\'' +
-                ", useDistrictCode2=" + useDistrictCode2 +
-                ", useDistrictName2='" + useDistrictName2 + '\'' +
-                ", landUseCode=" + landUseCode +
-                ", landUseName='" + landUseName + '\'' +
-                ", terrainHeightCode=" + terrainHeightCode +
-                ", terrainHeightName='" + terrainHeightName + '\'' +
-                ", terrainShapeCode=" + terrainShapeCode +
-                ", terrainShapeName='" + terrainShapeName + '\'' +
-                ", roadSideCode=" + roadSideCode +
-                ", roadSideName='" + roadSideName + '\'' +
-                ", officialLandPrice=" + officialLandPrice +
-                ", dataStandardDate=" + dataStandardDate +
-                ", boundary=" + boundary +
-                ", centerPoint=" + centerPoint +
-                ", createdAt=" + createdAt +
-                ", updatedAt=" + updatedAt +
-                '}';
     }
 }

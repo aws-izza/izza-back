@@ -25,6 +25,11 @@ public class BeopjungDong {
 
     private String type;
 
+    private String sidoName;
+    private String sigName;
+    private String emdName;
+    private String riName;
+
     private List<Point> boundary;
 
     private Point centerPoint;

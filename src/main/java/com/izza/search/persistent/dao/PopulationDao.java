@@ -1,7 +1,7 @@
 package com.izza.search.persistent.dao;
 
 import com.izza.search.persistent.model.Population;
-import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.utils.ResultSetUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;

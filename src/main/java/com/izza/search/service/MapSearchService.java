@@ -12,6 +12,8 @@ import com.izza.search.persistent.dao.ElectricityCostDao;
 import com.izza.search.persistent.model.EmergencyText;
 import com.izza.search.persistent.dao.EmergencyTextDao;
 import com.izza.search.persistent.dto.query.CountLandQuery;
+import com.izza.search.persistent.dto.query.FullCodeLandSearchQuery;
+import com.izza.search.persistent.dto.query.LandSearchQuery;
 import com.izza.search.persistent.dto.query.MapSearchQuery;
 import com.izza.search.persistent.model.Population;
 import com.izza.search.persistent.dao.PopulationDao;
@@ -28,6 +30,8 @@ import com.izza.search.vo.PopulationInfo;
 import com.izza.search.vo.UseZoneCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.izza.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +48,17 @@ public class MapSearchService {
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
+        
+        if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
+            landSearchFilterRequest = new LandSearchFilterRequest(
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
+            );
+        }
+        
         ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
         if (zoomLevel.equals(ZoomLevel.LAND)) {
             return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
@@ -54,7 +69,22 @@ public class MapSearchService {
 
     private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
             LandSearchFilterRequest landSearchFilterRequest) {
-        List<Land> lands = landDao.findLandsInMapBounds(mapSearchRequest, landSearchFilterRequest);
+
+        List<Integer> useZoneIds = UseZoneCode
+                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+        // 새로운 통합 쿼리 DTO 사용
+        LandSearchQuery query = new LandSearchQuery(
+                mapSearchRequest.southWestLng(),
+                mapSearchRequest.southWestLat(),
+                mapSearchRequest.northEastLng(),
+                mapSearchRequest.northEastLat(),
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                useZoneIds);
+
+        List<Land> lands = landDao.findLands(query);
 
         return lands.stream().map(land -> new LandGroupSearchResponse(
                 land.getUniqueNo(),
@@ -124,14 +154,14 @@ public class MapSearchService {
             String polygonType,
             String id) {
 
-        if (polygonType.equals("GROUP")) {
+        if (polygonType.equalsIgnoreCase("GROUP")) {
             List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
-        } else if (polygonType.equals("LAND")) {
+        } else if (polygonType.equalsIgnoreCase("LAND")) {
             List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
             return new PolygonDataResponse(landPolygon);
         } else {
-            throw new IllegalArgumentException("유효하지 않은 폴리곤 타입 입니다: " + polygonType);
+            throw new BusinessException("유효하지 않은 폴리곤 타입입니다: " + polygonType, HttpStatus.BAD_REQUEST);
         }
 
     }
@@ -139,7 +169,7 @@ public class MapSearchService {
     public LandDetailResponse getLandDataById(String landId) {
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
-            throw new IllegalArgumentException("Land not found with id: " + landId);
+            throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
         }
 
         Land land = landOptional.get();
@@ -173,41 +203,83 @@ public class MapSearchService {
                 land.getCenterPoint());
     }
 
-    public AreaDetailResponse getAreaDetails(
-            String landId) {
+    public AreaDetailResponse getAreaDetailsByLandId(String landId) {
         // first fetch the land of the land from landId
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
-            throw new IllegalArgumentException("Land not found with id: " + landId);
+            throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
         }
 
-        // then extract its full_code, converting it to sig_code
+        // then extract its full_code and call getAreaDetailsByFullCode
         Land land = landOptional.get();
-        String full_code = land.getBeopjungDongCode();
-        String sig_code = full_code.substring(0, 5) + "00000";
+        String fullCode = land.getBeopjungDongCode();
+        
+        return getAreaDetailsByFullCode(fullCode);
+    }
+    
+    public AreaDetailResponse getAreaDetailsByFullCode(String fullCode) {
+        String sigCode = fullCode.substring(0, 5) + "00000";
 
         // then fetch the area's information using sig_code
-        Optional<BeopjungDong> areaOptional = beopjungDongDao.findByFullCode(sig_code);
+        Optional<BeopjungDong> areaOptional = beopjungDongDao.findByFullCode(sigCode);
         if (areaOptional.isEmpty()) {
-            throw new IllegalArgumentException("Area not found with full_code: " + sig_code);
+            throw new BusinessException("행정구역을 찾을 수 없습니다: " + sigCode, HttpStatus.NOT_FOUND);
         }
 
         BeopjungDong area = areaOptional.get();
         String address = area.getKoreanName();
 
         // then fetch electricity cost
-        ElectricityCost electricityCost = electricityCostDao.findAllByFullCode(sig_code).get(0);
+        ElectricityCost electricityCost = electricityCostDao.findByFullCode(sigCode).orElse(null);
         ElectricityCostInfo costInfo = ElectricityCostInfo.of(electricityCost);
 
         // then fetch emergency texts
-        List<EmergencyText> emergencyText = emergencyTextDao.findByFullCode(sig_code);
+        List<EmergencyText> emergencyText = emergencyTextDao.findByFullCode(sigCode);
         EmergencyTextInfo textInfo = EmergencyTextInfo.fromDisasterList(emergencyText);
 
         // lastly populations
         // population data need to be accumulated - they're on EMD level
-        Population populationSum = populationDao.findAggregatedByFullCode(full_code);
+        Population populationSum = populationDao.findAggregatedByFullCode(fullCode);
         PopulationInfo populationInfo = PopulationInfo.of(populationSum);
 
-        return new AreaDetailResponse(full_code, address ,costInfo, textInfo, populationInfo);
+        return new AreaDetailResponse(fullCode, address, costInfo, textInfo, populationInfo);
+    }
+    
+    /**
+     * fullCode와 범위 조건으로 토지 목록 조회
+     * 
+     * @param fullCode 법정동 코드
+     * @param landSearchFilterRequest 토지 검색 필터 (면적, 가격, 용도지역)
+     * @return 조건에 맞는 토지 목록
+     */
+    public List<Land> findLandsByFullCodeAndFilter(String fullCode, LandSearchFilterRequest landSearchFilterRequest) {
+        String sigCode = fullCode.substring(0, 5);
+
+        // 용도지역 카테고리가 없으면 기본값 설정
+        if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
+            landSearchFilterRequest = new LandSearchFilterRequest(
+                    landSearchFilterRequest.landAreaMin(),
+                    landSearchFilterRequest.landAreaMax(),
+                    landSearchFilterRequest.officialLandPriceMin(),
+                    landSearchFilterRequest.officialLandPriceMax(),
+                    List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
+            );
+        }
+
+
+        // 용도지역 카테고리를 코드로 변환
+        List<Integer> useZoneIds = UseZoneCode.convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
+        
+        // fullCode 기반 토지 검색을 위한 쿼리 생성
+        FullCodeLandSearchQuery query = new FullCodeLandSearchQuery(
+                sigCode,
+                landSearchFilterRequest.landAreaMin(),
+                landSearchFilterRequest.landAreaMax(),
+                landSearchFilterRequest.officialLandPriceMin(),
+                landSearchFilterRequest.officialLandPriceMax(),
+                useZoneIds
+        );
+        
+        return landDao.findLandsByFullCode(query);
     }
 }

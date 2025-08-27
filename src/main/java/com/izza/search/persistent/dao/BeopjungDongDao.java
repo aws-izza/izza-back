@@ -2,8 +2,8 @@ package com.izza.search.persistent.dao;
 
 import com.izza.search.persistent.model.BeopjungDong;
 import com.izza.search.persistent.dto.query.MapSearchQuery;
-import com.izza.search.persistent.utils.GisUtils;
-import com.izza.search.persistent.utils.ResultSetUtils;
+import com.izza.utils.GisUtils;
+import com.izza.utils.ResultSetUtils;
 import com.izza.search.vo.Point;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -81,30 +81,64 @@ public class BeopjungDongDao {
         return results;
     }
 
+    public List<BeopjungDong> findAllSido() {
+        String sql = """
+                SELECT *, 
+                       ST_X(center_point) as center_lng,
+                       ST_Y(center_point) as center_lat
+                FROM beopjeong_dong
+                WHERE dong_type = ?
+                ORDER BY full_code
+                """;
+
+        return jdbcTemplate.query(sql, new BeopjungDongRowMapper(),
+                "SIDO");
+    }
+
+    /**
+     * full_code prefix로 시도/시군구 조회
+     */
+    public List<BeopjungDong> findByParentCode(String parentCode) {
+        String sql = """
+                SELECT *,
+                       ST_X(center_point) as center_lng,
+                       ST_Y(center_point) as center_lat
+                FROM beopjeong_dong
+                WHERE parent_code = ?
+                ORDER BY full_code
+                """;
+
+        return jdbcTemplate.query(sql, new BeopjungDongRowMapper(), parentCode);
+    }
+
     private static class BeopjungDongRowMapper implements RowMapper<BeopjungDong> {
         @Override
         public BeopjungDong mapRow(ResultSet rs, int rowNum) throws SQLException {
-            BeopjungDong areaPolygon = new BeopjungDong();
+            BeopjungDong beopjungDong = new BeopjungDong();
 
-            ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(areaPolygon::setFullCode);
-            ResultSetUtils.getStringSafe(rs, "korean_name").ifPresent(areaPolygon::setKoreanName);
-            ResultSetUtils.getStringSafe(rs, "english_name").ifPresent(areaPolygon::setEnglishName);
-            ResultSetUtils.getStringSafe(rs, "type").ifPresent(areaPolygon::setType);
+            ResultSetUtils.getStringSafe(rs, "full_code").ifPresent(beopjungDong::setFullCode);
+            ResultSetUtils.getStringSafe(rs, "korean_name").ifPresent(beopjungDong::setKoreanName);
+            ResultSetUtils.getStringSafe(rs, "english_name").ifPresent(beopjungDong::setEnglishName);
+            ResultSetUtils.getStringSafe(rs, "dong_type").ifPresent(beopjungDong::setType);
+            ResultSetUtils.getStringSafe(rs, "sido").ifPresent(beopjungDong::setSidoName);
+            ResultSetUtils.getStringSafe(rs, "sig").ifPresent(beopjungDong::setSigName);
+            ResultSetUtils.getStringSafe(rs, "emd").ifPresent(beopjungDong::setEmdName);
+            ResultSetUtils.getStringSafe(rs, "ri").ifPresent(beopjungDong::setRiName);
 
             String boundaryWkt = ResultSetUtils.getStringSafe(rs, "boundary_wkt").orElse(null);
             if (boundaryWkt != null && !boundaryWkt.trim().isEmpty()) {
-                areaPolygon.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
+                beopjungDong.setBoundary(GisUtils.parsePolygonToPointList(boundaryWkt));
             } else {
-                areaPolygon.setBoundary(new ArrayList<>());
+                beopjungDong.setBoundary(new ArrayList<>());
             }
 
             Optional<Double> centerLng = ResultSetUtils.getDoubleSafe(rs, "center_lng");
             Optional<Double> centerLat = ResultSetUtils.getDoubleSafe(rs, "center_lat");
             if (centerLng.isPresent() && centerLat.isPresent()) {
-                areaPolygon.setCenterPoint(new Point(centerLng.get(), centerLat.get()));
+                beopjungDong.setCenterPoint(new Point(centerLng.get(), centerLat.get()));
             }
 
-            return areaPolygon;
+            return beopjungDong;
         }
     }
 }

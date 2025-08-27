@@ -1,4 +1,4 @@
-package com.izza.search.persistent.utils;
+package com.izza.utils;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
