@@ -16,7 +16,7 @@ import java.util.List;
 @Schema(description = "토지 분석 요청")
 public class LandAnalysisRequest {
     
-    @Schema(description = "법정동 코드", example = "11000000")
+    @Schema(description = "법정동 코드", example = "11676000")
     private String fullCode;
     
     @Schema(description = "토지 면적 통계 범위")
