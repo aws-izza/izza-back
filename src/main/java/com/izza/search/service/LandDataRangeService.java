@@ -1,11 +1,14 @@
 package com.izza.search.service;
 
 import com.izza.exception.BusinessException;
+import com.izza.search.persistent.dao.BeopjungDongDao;
 import com.izza.search.persistent.dao.ElectricityCostDao;
 import com.izza.search.persistent.dao.LandStatisticsDao;
+import com.izza.search.persistent.model.BeopjungDong;
 import com.izza.search.persistent.model.ElectricityCost;
 import com.izza.search.persistent.model.LandStatistics;
 import com.izza.search.presentation.dto.LongRangeDto;
+import com.izza.search.presentation.dto.response.RegionResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -29,6 +33,7 @@ public class LandDataRangeService {
 
     private final LandStatisticsDao landStatisticsDao;
     private final ElectricityCostDao electricityCostDao;
+    private final BeopjungDongDao beopjungDongDao;
 
 
     public LongRangeDto getLandAreaRange() {
@@ -70,6 +75,24 @@ public class LandDataRangeService {
 
     public LongRangeDto getDisasterCountRange() {
         return getRange(DISASTER_COUNT_RANGE_TYPE);
+    }
+
+    public List<RegionResponse> getRegionsByFullCode(String fullCode) {
+        List<BeopjungDong> regions;
+        if (StringUtils.isEmpty(fullCode)) {
+            regions = beopjungDongDao.findAllSido();
+        } else {
+            regions = beopjungDongDao.findByParentCode(fullCode);
+        }
+        return regions.stream()
+                .map(region -> {
+                    if (region.getType().equals("SIDO"))
+                        return new RegionResponse(region.getFullCode(), region.getSidoName());
+                    else {
+                        return new RegionResponse(region.getFullCode(), region.getSigName());
+                    }
+                })
+                .toList();
     }
 
     private LongRangeDto getRange(String statType) {

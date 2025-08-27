@@ -40,7 +40,8 @@ public class LandDao {
                   ST_AsText(boundary) as boundary_wkt,\s
                   ST_X(center_point) as center_lng,\s
                   ST_Y(center_point) as center_lat\s
-                  FROM land WHERE 1=1\s
+                  FROM land\s 
+                  WHERE\s
                 """;
         sqlBuilder.append(sql);
 
@@ -48,7 +49,7 @@ public class LandDao {
 
         // 지도 영역 필터링 (center_point 기준)
         if (query.hasMapBounds()) {
-            sqlBuilder.append("AND ST_Contains(ST_MakeEnvelope(?, ?, ?, ?, 4326), center_point) ");
+            sqlBuilder.append("ST_Contains(ST_MakeEnvelope(?, ?, ?, ?, 4326), center_point) ");
             params.add(query.southWestLng());
             params.add(query.southWestLat());
             params.add(query.northEastLng());

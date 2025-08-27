@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 @Getter
 public enum ZoomLevel {
     SIDO(9, 14, "SIDO"),
-    SIG(5, 8, "SIG"),
-    EMD(3, 4, "EMD"),
-    LAND(0, 2, "LAND");
+    SIG(6, 8, "SIG"),
+    EMD(4, 5, "EMD"),
+    LAND(0, 3, "LAND");
 
     private final int min;
     private final int max;
