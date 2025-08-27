@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 토지 점수 계산 및 순위 분석 기능 제공
  */
 @RestController
-@RequestMapping("/api/v1/land-analysis")
+@RequestMapping("${app.base-path}/api/v1/land-analysis")
 @RequiredArgsConstructor
 @Tag(name = "토지 분석")
 public class LandAnalysisController {

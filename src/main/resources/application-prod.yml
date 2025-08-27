@@ -3,7 +3,7 @@
 #     context-path: /prod/api/v1
 
 app:
-  base-path: "/prod"
+  base-path: ""
 
 spring:
   config:
