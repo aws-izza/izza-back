@@ -121,7 +121,7 @@ spec:
                             '''
                             
                             sh """
-                                sed -i 's|image: .*|image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' environments/dev/app.yaml
+                                sed -i 's|image: .*|image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' environments/app/backend/dev/backend-dev.yaml
                             """
                             
                             sh """
