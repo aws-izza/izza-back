@@ -24,6 +24,12 @@ spec:
     - sleep
     args:
     - 99d
+  - name: gradle
+    image: gradle:8.10.2-jdk21
+    command:
+    - sleep
+    args:
+    - 99d
   volumes:
   - name: aws-secret
     secret:
@@ -48,6 +54,21 @@ spec:
                 echo "✅ 코드 체크아웃 완료"
             }
         }
+        stage('SonarQube Analysis') {
+            steps {
+                container('gradle') {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            ./gradlew sonarqube \
+                            -Dsonar.projectKey=izza-back \
+                            -Dsonar.host.url=http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                            -Dsonar.login=$SONAR_TOKEN
+                        """
+                    }
+                }
+            }
+        }
+
         
         stage('Checkout GitOps Repository') {
             steps {
