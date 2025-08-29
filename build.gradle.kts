@@ -85,6 +85,6 @@ sonarqube {
         property("sonar.sourceEncoding", "UTF-8")
         property("sonar.token", System.getenv("SONAR_TOKEN"))
         property("sonar.java.binaries", "build/classes/java/main")
-        property("sonar.java.test.binaries", "build/classes/java/test")
+        property("sonar.sources", "src/main")
     }
 }
