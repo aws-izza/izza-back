@@ -61,7 +61,7 @@ spec:
                         sh """
                             ./gradlew sonar \
                             -Dsonar.projectKey=izza-back \
-                            -Dsonar.host.url=http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                            -Dsonar.host.url=http://sonarqube-service.sonarqube.svc.cluster.local:9000 \
                             -Dsonar.login=$SONAR_TOKEN
                         """
                     }
