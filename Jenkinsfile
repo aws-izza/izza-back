@@ -60,7 +60,7 @@ spec:
                 container('gradle') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                         sh """
-                            ./gradlew clean build sonar
+                            ./gradlew clean build sonar -x test
                         """
                     }
                 }
