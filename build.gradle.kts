@@ -81,7 +81,7 @@ sonarqube {
     properties {
         property("sonar.projectKey", "izza-back")
         property("sonar.projectName", "izza-back")
-        property("sonar.host.url", "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000")
+        property("sonar.host.url", "http://sonarqube-service.sonarqube.svc.cluster.local:9000")
         property("sonar.sourceEncoding", "UTF-8")
         property("sonar.login", System.getenv("SONAR_TOKEN"))
     }
