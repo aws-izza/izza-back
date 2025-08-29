@@ -33,6 +33,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.izza.exception.BusinessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true, isolation = Isolation.READ_UNCOMMITTED)
 public class MapSearchService {
     private final BeopjungDongDao beopjungDongDao;
     private final LandDao landDao;
@@ -172,6 +175,7 @@ public class MapSearchService {
         Land land = landOptional.get();
 
         return new LandDetailResponse(
+                land.getId(),
                 land.getUniqueNo(),
                 land.getBeopjungDongCode(),
                 land.getAddress(),
@@ -261,5 +265,40 @@ public class MapSearchService {
         );
         
         return landDao.findLandsByFullCode(query);
+    }
+
+    public LandDetailResponse searchByAddress(String address) {
+        Optional<Land> landOptional = landDao.findByAddress(address);
+        if (landOptional.isEmpty()) {
+            throw new BusinessException("주소에 해당하는 토지를 찾을 수 없습니다: " + address, HttpStatus.NOT_FOUND);
+        }
+        
+        Land land = landOptional.get();
+        return new LandDetailResponse(
+                land.getId(),
+                land.getUniqueNo(),
+                land.getBeopjungDongCode(),
+                land.getAddress(),
+                land.getLedgerDivisionCode(),
+                land.getLedgerDivisionName(),
+                land.getBaseYear(),
+                land.getBaseMonth(),
+                land.getLandCategoryCode(),
+                land.getLandCategoryName(),
+                land.getLandArea(),
+                land.getUseDistrictCode1(),
+                land.getUseDistrictName1(),
+                land.getLandUseCode(),
+                land.getLandUseName(),
+                land.getTerrainHeightCode(),
+                land.getTerrainHeightName(),
+                land.getTerrainShapeCode(),
+                land.getTerrainShapeName(),
+                land.getRoadSideCode(),
+                land.getRoadSideName(),
+                land.getOfficialLandPrice(),
+                land.getDataStandardDate(),
+                land.getBoundary(),
+                land.getCenterPoint());
     }
 }

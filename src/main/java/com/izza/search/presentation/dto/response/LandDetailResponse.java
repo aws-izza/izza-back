@@ -11,6 +11,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "토지 상세 정보 응답")
 public record LandDetailResponse(
 
+        @Schema(description = "토지 ID", example = "1")
+        Long id,
+
         // 기본 구분자
         @Schema(description = "토지 ID", example = "1")
         String uniqueNo,

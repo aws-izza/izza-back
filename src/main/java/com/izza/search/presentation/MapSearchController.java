@@ -69,4 +69,12 @@ public class MapSearchController {
     ) {
         return BaseApiResponse.ok(mapSearchService.getAreaDetailsByLandId(landId));
     }
+
+    @GetMapping("/address/{address}")
+    @Operation(summary = "주소로 토지 검색")
+    public BaseApiResponse<LandDetailResponse> searchByAddress(
+            @PathVariable("address") String address
+    ) {
+        return BaseApiResponse.ok(mapSearchService.searchByAddress(address));
+    }
 }

@@ -261,6 +261,23 @@ public class LandDao {
         return jdbcTemplate.query(sql.toString(), new LandRowMapper(), params.toArray());
     }
 
+    /**
+     * 주소로 토지 검색 (정확히 일치)
+     */
+    public Optional<Land> findByAddress(String address) {
+        String sql = """
+                SELECT l.*,
+                ST_AsText(lg.boundary) as boundary_wkt,
+                ST_X(lg.center_point) as center_lng,
+                ST_Y(lg.center_point) as center_lat
+                FROM land l
+                LEFT JOIN land_gis lg ON l.id = lg.land_id
+                WHERE l.address = ?
+                """;
+        List<Land> results = jdbcTemplate.query(sql, new LandRowMapper(), address);
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
 
     /**
      * Land 엔티티 RowMapper
