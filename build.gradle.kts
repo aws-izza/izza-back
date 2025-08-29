@@ -3,6 +3,7 @@ plugins {
     id("org.springframework.boot") version "3.5.4"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.asciidoctor.jvm.convert") version "3.3.2"
+    id("org.sonarqube") version "5.0.0.4638"
 }
 
 group = "com"
@@ -74,4 +75,14 @@ tasks.test {
 tasks.asciidoctor {
     inputs.dir(project.extra["snippetsDir"]!!)
     dependsOn(tasks.test)
+}
+
+sonarqube {
+    properties {
+        property("sonar.projectKey", "izza-back")
+        property("sonar.projectName", "izza-back")
+        property("sonar.host.url", "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000")
+        property("sonar.sourceEncoding", "UTF-8")
+        property("sonar.login", System.getenv("SONAR_TOKEN"))
+    }
 }

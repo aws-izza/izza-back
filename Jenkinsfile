@@ -125,7 +125,7 @@ spec:
                             """
                             
                             sh """
-                                git add environments/dev/app.yaml
+                                git add environments/app/backend/dev/backend-dev.yaml
                                 git commit -m "Update dev image tag to ${IMAGE_TAG}"
                                 git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/aws-izza/izza-cd.git main
                             """
