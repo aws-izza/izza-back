@@ -32,13 +32,27 @@ create table land
     boundary             geometry(Polygon, 4326) not null,
     center_point         geometry(Point, 4326),
     created_at           timestamp default CURRENT_TIMESTAMP,
-    updated_at           timestamp default CURRENT_TIMESTAMP
+    updated_at           timestamp default CURRENT_TIMESTAMP,
+    use_zone_category    varchar(20)
 );
 
 -- land 테이블 공간 인덱스
-create index idx_land_boundary_gist on land using gist(boundary);
 create index idx_land_full_code on land(full_code);
-create index idx_land_center_point_gist on land using gist(center_point);
+
+create table land_gis
+(
+    land_id      bigint                  not null
+        primary key
+        references land
+            on delete cascade,
+    boundary     geometry(Polygon, 4326) not null,
+    center_point geometry(Point, 4326),
+    created_at   timestamp default CURRENT_TIMESTAMP,
+    updated_at   timestamp default CURRENT_TIMESTAMP
+);
+
+create index idx_land_gis_center_point_gist on land_gis using gist(center_point);
+
 
 -- 토지 통계 테이블 생성
 create table land_statistics (

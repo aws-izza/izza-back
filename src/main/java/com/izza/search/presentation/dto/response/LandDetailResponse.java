@@ -54,12 +54,6 @@ public record LandDetailResponse(
         @Schema(description = "용도지역 이름 1", example = "중심상업지역")
         String useDistrictName1,
 
-        @Schema(description = "용도지역 코드 2", example = "0")
-        Short useDistrictCode2,
-
-        @Schema(description = "용도지역 이름 2", example = "지정되지않음")
-        String useDistrictName2,
-
         // 토지 이용 상황
         @Schema(description = "토지 이용 코드", example = "220")
         Short landUseCode,

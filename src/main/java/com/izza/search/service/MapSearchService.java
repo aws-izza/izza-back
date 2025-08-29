@@ -2,6 +2,7 @@ package com.izza.search.service;
 
 import com.izza.search.domain.BeopjungDongType;
 import com.izza.search.domain.ZoomLevel;
+import com.izza.search.persistent.dao.LandGisDao;
 import com.izza.search.persistent.model.BeopjungDong;
 import com.izza.search.persistent.dao.BeopjungDongDao;
 import com.izza.search.persistent.model.Land;
@@ -42,6 +43,7 @@ import java.util.Optional;
 public class MapSearchService {
     private final BeopjungDongDao beopjungDongDao;
     private final LandDao landDao;
+    private final LandGisDao landGisDao;
     private final ElectricityCostDao electricityCostDao;
     private final EmergencyTextDao emergencyTextDao;
     private final PopulationDao populationDao;
@@ -70,9 +72,7 @@ public class MapSearchService {
     private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
             LandSearchFilterRequest landSearchFilterRequest) {
 
-        List<Integer> useZoneIds = UseZoneCode
-                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
-        // 새로운 통합 쿼리 DTO 사용
+        // useZoneCategories를 직접 사용 (더 이상 변환 불필요)
         LandSearchQuery query = new LandSearchQuery(
                 mapSearchRequest.southWestLng(),
                 mapSearchRequest.southWestLat(),
@@ -82,12 +82,12 @@ public class MapSearchService {
                 landSearchFilterRequest.landAreaMax(),
                 landSearchFilterRequest.officialLandPriceMin(),
                 landSearchFilterRequest.officialLandPriceMax(),
-                useZoneIds);
+                landSearchFilterRequest.useZoneCategories());
 
         List<Land> lands = landDao.findLands(query);
 
         return lands.stream().map(land -> new LandGroupSearchResponse(
-                land.getUniqueNo(),
+                land.getId().toString(),
                 land.getAddress(),
                 null,
                 land.getCenterPoint(),
@@ -104,9 +104,6 @@ public class MapSearchService {
 
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
-        List<Integer> useZoneIds = UseZoneCode
-                .convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
-
         BeopjungDongType beopjungDongType = BeopjungDongType.valueOf(zoomLevel.getType());
         List<String> fullCodePrefixes = beopjeongDongs.stream()
                 .map(dong -> dong.getFullCode().substring(0, beopjungDongType.getCodeLength()))
@@ -122,7 +119,7 @@ public class MapSearchService {
                     landSearchFilterRequest.landAreaMax(),
                     landSearchFilterRequest.officialLandPriceMin(),
                     landSearchFilterRequest.officialLandPriceMax(),
-                    useZoneIds);
+                    landSearchFilterRequest.useZoneCategories());
 
             landCountQueryResults = landDao.countLandsByRegions(query);
         }
@@ -158,7 +155,7 @@ public class MapSearchService {
             List<List<Point>> areaPolygon = beopjungDongDao.findPolygonByFullCode(id);
             return new PolygonDataResponse(areaPolygon);
         } else if (polygonType.equalsIgnoreCase("LAND")) {
-            List<List<Point>> landPolygon = landDao.findPolygonByUniqueNumber(id);
+            List<List<Point>> landPolygon = landGisDao.findPolygonByLandId(Long.valueOf(id));
             return new PolygonDataResponse(landPolygon);
         } else {
             throw new BusinessException("유효하지 않은 폴리곤 타입입니다: " + polygonType, HttpStatus.BAD_REQUEST);
@@ -166,7 +163,7 @@ public class MapSearchService {
 
     }
 
-    public LandDetailResponse getLandDataById(String landId) {
+    public LandDetailResponse getLandDataById(Long landId) {
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
             throw new BusinessException("토지를 찾을 수 없습니다: " + landId, HttpStatus.NOT_FOUND);
@@ -187,8 +184,6 @@ public class MapSearchService {
                 land.getLandArea(),
                 land.getUseDistrictCode1(),
                 land.getUseDistrictName1(),
-                land.getUseDistrictCode2(),
-                land.getUseDistrictName2(),
                 land.getLandUseCode(),
                 land.getLandUseName(),
                 land.getTerrainHeightCode(),
@@ -203,7 +198,7 @@ public class MapSearchService {
                 land.getCenterPoint());
     }
 
-    public AreaDetailResponse getAreaDetailsByLandId(String landId) {
+    public AreaDetailResponse getAreaDetailsByLandId(Long landId) {
         // first fetch the land of the land from landId
         Optional<Land> landOptional = landDao.findById(landId);
         if (landOptional.isEmpty()) {
@@ -255,29 +250,14 @@ public class MapSearchService {
     public List<Land> findLandsByFullCodeAndFilter(String fullCode, LandSearchFilterRequest landSearchFilterRequest) {
         String sigCode = fullCode.substring(0, 5);
 
-        // 용도지역 카테고리가 없으면 기본값 설정
-        if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
-            landSearchFilterRequest = new LandSearchFilterRequest(
-                    landSearchFilterRequest.landAreaMin(),
-                    landSearchFilterRequest.landAreaMax(),
-                    landSearchFilterRequest.officialLandPriceMin(),
-                    landSearchFilterRequest.officialLandPriceMax(),
-                    List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
-            );
-        }
-
-
-        // 용도지역 카테고리를 코드로 변환
-        List<Integer> useZoneIds = UseZoneCode.convertCategoryNamesToZoneCodes(landSearchFilterRequest.useZoneCategories());
-        
-        // fullCode 기반 토지 검색을 위한 쿼리 생성
+        // 용도지역 카테고리를 직접 사용 (더 이상 변환 불필요)
         FullCodeLandSearchQuery query = new FullCodeLandSearchQuery(
                 sigCode,
                 landSearchFilterRequest.landAreaMin(),
                 landSearchFilterRequest.landAreaMax(),
                 landSearchFilterRequest.officialLandPriceMin(),
                 landSearchFilterRequest.officialLandPriceMax(),
-                useZoneIds
+                landSearchFilterRequest.useZoneCategories().get(0)
         );
         
         return landDao.findLandsByFullCode(query);

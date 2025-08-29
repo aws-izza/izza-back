@@ -8,6 +8,6 @@ public record CountLandQuery(
         Long landAreaMax,
         Long officialLandPriceMin,
         Long officialLandPriceMax,
-        List<Integer> useZoneIds
+        List<String> useZoneCategories
 ) {
 }

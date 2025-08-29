@@ -57,7 +57,7 @@ public class MapSearchController {
     @GetMapping("/land/{landId}")
     @Operation(summary = "토지 상세 정보 조회")
     public BaseApiResponse<LandDetailResponse> getLandDetails(
-            @PathVariable("landId") String landId
+            @PathVariable("landId") Long landId
     ) {
         return BaseApiResponse.ok(mapSearchService.getLandDataById(landId));
     }
@@ -65,7 +65,7 @@ public class MapSearchController {
     @GetMapping("/area/{landId}")
     @Operation(summary = "특정 토지가 소속된 행정구역의 상세 정보 조회")
     public BaseApiResponse<AreaDetailResponse> getAreaDetails(
-            @PathVariable("landId") String landId
+            @PathVariable("landId") Long landId
     ) {
         return BaseApiResponse.ok(mapSearchService.getAreaDetailsByLandId(landId));
     }

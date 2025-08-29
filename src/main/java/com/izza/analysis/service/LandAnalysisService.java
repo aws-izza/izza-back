@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 토지 분석 서비스
@@ -76,45 +77,64 @@ public class LandAnalysisService {
         Map<AnalysisStatisticsType, Double> globalNormalizedWeights =
                 weightCalculator.createGlobalNormalizedWeights(statisticsRanges);
 
-        // 4. 각 토지별 점수 계산
+        // 4. 배치 단위로 토지별 점수 계산
         List<LandScoreItem> landScoreItems = new ArrayList<>();
+        final int BATCH_SIZE = 1000;
+        
+        for (int i = 0; i < lands.size(); i += BATCH_SIZE) {
+            int endIndex = Math.min(i + BATCH_SIZE, lands.size());
+            List<Land> landBatch = lands.subList(i, endIndex);
+            
+            log.info("배치 처리 중: {}/{} (배치 크기: {})", i + landBatch.size(), lands.size(), landBatch.size());
+            
+            // 배치 단위로 전력 인프라 정보 조회
+            List<Long> landIds = landBatch.stream().map(Land::getId).toList();
+            List<LandPowerInfrastructureSummary> powerInfraSummaries = 
+                    powerInfrastructureDao.findByLandIds(landIds);
+            
+            // landId를 키로 하는 Map으로 변환 (빠른 조회를 위해)
+            Map<Long, LandPowerInfrastructureSummary> powerInfraMap = powerInfraSummaries.stream()
+                    .collect(Collectors.toMap(
+                            LandPowerInfrastructureSummary::getLandId, 
+                            summary -> summary));
+            
+            // 배치 내 각 토지별 점수 계산
+            for (Land land : landBatch) {
+                LandPowerInfrastructureSummary powerInfraSummary = powerInfraMap.get(land.getId());
+                
+                // LandAnalysisData 구성
+                LandAnalysisData analysisData = LandAnalysisData.builder()
+                        .land(land)
+                        .electricityCostInfo(areaDetails.electricityCostInfo())
+                        .emergencyTextInfo(areaDetails.emergencyTextInfo())
+                        .populationInfo(areaDetails.populationInfo())
+                        .substationCount(powerInfraSummary != null ? powerInfraSummary.getSubstationCount() : null)
+                        .transmissionTowerCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionTowerCount() : null)
+                        .transmissionLineCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionLineCount() : null)
+                        .statisticsRanges(statisticsRanges)
+                        .categoryNormalizedWeights(categoryNormalizedWeights)
+                        .globalNormalizedWeights(globalNormalizedWeights)
+                        .targetUseDistrictCodes(request.getTargetUseDistrictCodes())
+                        .industryType(IndustryType.fromCode(request.getIndustryType()))
+                        .build();
 
-        for (Land land : lands) {
-            // 전력 인프라 정보 조회
-            LandPowerInfrastructureSummary powerInfraSummary = getPowerInfrastructureData(land.getId());
+                // 점수 계산
+                Map<AnalysisStatisticsType, ScoreResult> scoreResults = calculateScores(analysisData);
+                double totalScore = calculateTotalScoreFromResults(scoreResults, analysisData);
 
-            // LandAnalysisData 구성
-            LandAnalysisData analysisData = LandAnalysisData.builder()
-                    .land(land)
-                    .electricityCostInfo(areaDetails.electricityCostInfo())
-                    .emergencyTextInfo(areaDetails.emergencyTextInfo())
-                    .populationInfo(areaDetails.populationInfo())
-                    .substationCount(powerInfraSummary.getSubstationCount())
-                    .transmissionTowerCount(powerInfraSummary.getTransmissionTowerCount())
-                    .transmissionLineCount(powerInfraSummary.getTransmissionLineCount())
-                    .statisticsRanges(statisticsRanges)
-                    .categoryNormalizedWeights(categoryNormalizedWeights)
-                    .globalNormalizedWeights(globalNormalizedWeights)
-                    .targetUseDistrictCodes(request.getTargetUseDistrictCodes())
-                    .industryType(IndustryType.fromCode(request.getIndustryType()))
-                    .build();
+                // LandScoreItem 생성
+                LandScoreItem item = LandScoreItem.builder()
+                        .landId(land.getId())
+                        .address(land.getAddress())
+                        .landArea(land.getLandArea())
+                        .officialLandPrice(land.getOfficialLandPrice())
+                        .totalScore(totalScore)
+                        .categoryScores(convertToCategoryScoreDetails(scoreResults))
+                        .globalScores(convertToGlobalScoreDetails(scoreResults))
+                        .build();
 
-            // 점수 계산
-            Map<AnalysisStatisticsType, ScoreResult> scoreResults = calculateScores(analysisData);
-            double totalScore = calculateTotalScoreFromResults(scoreResults, analysisData);
-
-            // LandScoreItem 생성
-            LandScoreItem item = LandScoreItem.builder()
-                    .landId(land.getId())
-                    .address(land.getAddress())
-                    .landArea(land.getLandArea())
-                    .officialLandPrice(land.getOfficialLandPrice())
-                    .totalScore(totalScore)
-                    .categoryScores(convertToCategoryScoreDetails(scoreResults))
-                    .globalScores(convertToGlobalScoreDetails(scoreResults))
-                    .build();
-
-            landScoreItems.add(item);
+                landScoreItems.add(item);
+            }
         }
 
         // 5. 점수 내림차순 정렬
@@ -222,20 +242,34 @@ public class LandAnalysisService {
             LandAnalysisRequest request) {
         Map<AnalysisStatisticsType, WeightedStatisticsRange> map = new HashMap<>();
 
-        map.put(AnalysisStatisticsType.LAND_AREA, request.getLandAreaRange());
-        map.put(AnalysisStatisticsType.OFFICIAL_LAND_PRICE, request.getLandPriceRange());
-        map.put(AnalysisStatisticsType.ELECTRICITY_COST, request.getElectricityCostRange());
+        // 필수 필드들은 null이 아닐 때만 추가
+        if (request.getLandAreaRange() != null) {
+            map.put(AnalysisStatisticsType.LAND_AREA, request.getLandAreaRange());
+        }
+        if (request.getLandPriceRange() != null) {
+            map.put(AnalysisStatisticsType.OFFICIAL_LAND_PRICE, request.getLandPriceRange());
+        }
+        if (request.getElectricityCostRange() != null) {
+            map.put(AnalysisStatisticsType.ELECTRICITY_COST, request.getElectricityCostRange());
+        }
 
-
-        // 선택 지표들은 사용자 요청에 없을 경우 어댑터를 통해 기본값 조회
-        map.put(AnalysisStatisticsType.SUBSTATION_COUNT,
-                convertToWeightedRange(request.getSubstationCountRange(), landDataRangeAdapter.getSubstationCountRange()));
-        map.put(AnalysisStatisticsType.TRANSMISSION_TOWER_COUNT,
-                convertToWeightedRange(request.getTransmissionTowerCountRange(), landDataRangeAdapter.getTransmissionTowerCountRange()));
-        map.put(AnalysisStatisticsType.TRANSMISSION_LINE_COUNT,
-                convertToWeightedRange(request.getTransmissionLineCountRange(), landDataRangeAdapter.getTransmissionLineCountRange()));
-        map.put(AnalysisStatisticsType.DISASTER_COUNT,
-                convertToWeightedRange(request.getDisasterCountRange(), landDataRangeAdapter.getDisasterCountRange()));
+        // 선택 지표들은 null이 아닐 때만 추가 (사용자 요청에 없을 경우 어댑터를 통해 기본값 조회)
+        if (request.getSubstationCountRange() != null) {
+            map.put(AnalysisStatisticsType.SUBSTATION_COUNT,
+                    convertToWeightedRange(request.getSubstationCountRange(), landDataRangeAdapter.getSubstationCountRange()));
+        }
+        if (request.getTransmissionTowerCountRange() != null) {
+            map.put(AnalysisStatisticsType.TRANSMISSION_TOWER_COUNT,
+                    convertToWeightedRange(request.getTransmissionTowerCountRange(), landDataRangeAdapter.getTransmissionTowerCountRange()));
+        }
+        if (request.getTransmissionLineCountRange() != null) {
+            map.put(AnalysisStatisticsType.TRANSMISSION_LINE_COUNT,
+                    convertToWeightedRange(request.getTransmissionLineCountRange(), landDataRangeAdapter.getTransmissionLineCountRange()));
+        }
+        if (request.getDisasterCountRange() != null) {
+            map.put(AnalysisStatisticsType.DISASTER_COUNT,
+                    convertToWeightedRange(request.getDisasterCountRange(), landDataRangeAdapter.getDisasterCountRange()));
+        }
 
         return map;
     }

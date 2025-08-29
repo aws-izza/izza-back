@@ -1,7 +1,5 @@
 package com.izza.search.persistent.dto.query;
 
-import java.util.List;
-
 /**
  * fullCode 기반 토지 검색을 위한 쿼리 DTO
  */
@@ -14,7 +12,7 @@ public record FullCodeLandSearchQuery(
         Long landAreaMax,
         Long officialLandPriceMin,
         Long officialLandPriceMax,
-        List<Integer> useZoneCategories
+        String useZoneCategories
 ) {
     
     /**

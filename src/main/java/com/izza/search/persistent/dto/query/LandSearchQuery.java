@@ -17,7 +17,7 @@ public record LandSearchQuery(
         Long landAreaMax,
         Long officialLandPriceMin,
         Long officialLandPriceMax,
-        List<Integer> useZoneCategories
+        List<String> useZoneCategories
 ) {
     
     /**

@@ -45,9 +45,7 @@ public class Land {
     // 용도지역 정보
     private Short useDistrictCode1;
     private String useDistrictName1;
-    private Short useDistrictCode2;
-    private String useDistrictName2;
-    
+
     // 토지 이용 상황
     private Short landUseCode;
     private String landUseName;
@@ -73,12 +71,9 @@ public class Land {
     
     // 토지 중심점
     private Point centerPoint;
-    
-    // 시스템 필드
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    
 
+    private String useZoneCategory;
+    
     /**
      * 지목코드를 enum으로 반환
      */
@@ -97,15 +92,5 @@ public class Land {
             return UseDistrictCode.UNSPECIFIED;
         }
         return UseDistrictCode.fromCode(useDistrictCode1.intValue());
-    }
-    
-    /**
-     * 두 번째 용도지구코드를 enum으로 반환
-     */
-    public UseDistrictCode getUseDistrict2() {
-        if (useDistrictCode2 == null) {
-            return UseDistrictCode.UNSPECIFIED;
-        }
-        return UseDistrictCode.fromCode(useDistrictCode2.intValue());
     }
 }
