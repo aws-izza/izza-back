@@ -54,12 +54,13 @@ spec:
                 echo "✅ 코드 체크아웃 완료"
             }
         }
-        stage('SonarQube Analysis') {
+
+        stage('Build & SonarQube Analysis') {
             steps {
                 container('gradle') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                         sh """
-                            ./gradlew sonar \
+                            ./gradlew clean build sonar -x test \
                             -Dsonar.projectKey=izza-back \
                             -Dsonar.host.url=http://sonarqube-service.sonarqube.svc.cluster.local:9000 \
                             -Dsonar.login=$SONAR_TOKEN
