@@ -59,7 +59,7 @@ spec:
                 container('gradle') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                         sh """
-                            ./gradlew sonarqube \
+                            ./gradlew sonar \
                             -Dsonar.projectKey=izza-back \
                             -Dsonar.host.url=http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
                             -Dsonar.login=$SONAR_TOKEN
@@ -68,7 +68,6 @@ spec:
                 }
             }
         }
-
         
         stage('Checkout GitOps Repository') {
             steps {
