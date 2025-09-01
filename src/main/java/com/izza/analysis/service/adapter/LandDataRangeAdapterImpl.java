@@ -37,8 +37,13 @@ public class LandDataRangeAdapterImpl implements LandDataRangeAdapter {
 
     @Override
     public AnalysisRangeDto getDisasterCountRange() {
-        // 현재는 임시로 고정값 반환
         LongRangeDto searchDto = landDataRangeService.getDisasterCountRange();
+        return convertToAnalysisRangeDto(searchDto);
+    }
+
+    @Override
+    public AnalysisRangeDto getElectricBillRange() {
+        LongRangeDto searchDto = landDataRangeService.getElectricBillRange(null);
         return convertToAnalysisRangeDto(searchDto);
     }
 

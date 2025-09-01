@@ -21,7 +21,7 @@ public enum AnalysisStatisticsType {
     ELECTRICITY_COST(AnalysisCategory.LOCATION_CONDITION, "전기요금"),
     
     /** 변전소 개수 통계 (개) */
-    SUBSTATION_COUNT(AnalysisCategory.INFRASTRUCTURE, "변전소개수"),
+    SUBSTATION_COUNT(AnalysisCategory.SAFETY, "변전소개수"),
     
     /** 송전탑 개수 통계 (개) */
     TRANSMISSION_TOWER_COUNT(AnalysisCategory.INFRASTRUCTURE, "송전탑개수"),

@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * fullCode 기반 토지 검색을 위한 쿼리 DTO
  */
-public record FullCodeLandSearchQuery(
+public record FullCodeLandCountQuery(
         // 법정동 코드 필터
         String fullCode,
         
@@ -14,7 +14,7 @@ public record FullCodeLandSearchQuery(
         Long landAreaMax,
         Long officialLandPriceMin,
         Long officialLandPriceMax,
-        String useZoneCategories
+        List<String> useZoneCategories
 ) {
     
     /**

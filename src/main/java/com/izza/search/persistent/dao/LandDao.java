@@ -2,6 +2,7 @@ package com.izza.search.persistent.dao;
 
 import com.izza.search.persistent.dto.LandCountQueryResult;
 import com.izza.search.persistent.dto.query.CountLandQuery;
+import com.izza.search.persistent.dto.query.FullCodeLandCountQuery;
 import com.izza.search.persistent.dto.query.FullCodeLandSearchQuery;
 import com.izza.search.persistent.dto.query.LandSearchQuery;
 import com.izza.search.persistent.model.Land;
@@ -102,6 +103,37 @@ public class LandDao {
         int priceBucketMin = (int) (query.officialLandPriceMin() / 500000);
         int priceBucketMax = (int) (query.officialLandPriceMax() / 500000);
 
+        // 각 지역의 최대 버킷값 조회하여 요청된 max값이 실제 최대값을 넘으면 조정
+        for (String keyPrefix : query.fullCodePrefixes()) {
+            String maxBucketSql = """
+                SELECT MAX(area_bucket) as max_area_bucket, MAX(price_bucket) as max_price_bucket \s
+                FROM land_statistics_prefix_sum \s
+                WHERE key_prefix = ? AND use_zone_category IN (%s)
+                """;
+            
+            String useZonePlaceholders = query.useZoneCategories().stream()
+                    .map(s -> "?")
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
+            
+            String finalMaxBucketSql = String.format(maxBucketSql, useZonePlaceholders);
+            
+            List<Object> maxBucketParams = new ArrayList<>();
+            maxBucketParams.add(keyPrefix);
+            maxBucketParams.addAll(query.useZoneCategories());
+            
+            Map<String, Object> maxBuckets = jdbcTemplate.queryForMap(finalMaxBucketSql, maxBucketParams.toArray());
+            Integer maxAreaBucket = (Integer) maxBuckets.get("max_area_bucket");
+            Integer maxPriceBucket = (Integer) maxBuckets.get("max_price_bucket");
+            
+            if (maxAreaBucket != null && areaBucketMax > maxAreaBucket) {
+                areaBucketMax = maxAreaBucket;
+            }
+            if (maxPriceBucket != null && priceBucketMax > maxPriceBucket) {
+                priceBucketMax = maxPriceBucket;
+            }
+        }
+
         StringBuilder sql = new StringBuilder();
         sql.append("""
                 SELECT \s
@@ -165,6 +197,9 @@ public class LandDao {
         params.add(areaBucketMax);
         params.add(priceBucketMax);
 
+
+        System.out.println(sql);
+        System.out.println(params);
         return jdbcTemplate.query(finalSql, (rs, rowNum) -> new LandCountQueryResult(
                 rs.getString("region_code"),
                 rs.getLong("land_count")), params.toArray());
@@ -265,9 +300,33 @@ public class LandDao {
     }
 
     /**
+     * 지역별 토지 면적의 최소값과 최대값 조회
+     */
+    public LongRangeDto getLandAreaRangeByRegion(String regionCode) {
+        String sql = "SELECT MIN(FLOOR(land_area)) as min_area, MAX(CEIL(land_area)) as max_area FROM land WHERE LEFT(full_code, 5) = ? AND land_area IS NOT NULL";
+        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+            long min = rs.getLong("min_area");
+            long max = rs.getLong("max_area");
+            return new LongRangeDto(min, max);
+        }, regionCode);
+    }
+
+    /**
+     * 지역별 공시지가의 최소값과 최대값 조회
+     */
+    public LongRangeDto getOfficialLandPriceRangeByRegion(String regionCode) {
+        String sql = "SELECT MIN(FLOOR(official_land_price)) as min_price, MAX(CEIL(official_land_price)) as max_price FROM land WHERE LEFT(full_code, 5) = ? AND official_land_price IS NOT NULL";
+        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+            long min = rs.getLong("min_price");
+            long max = rs.getLong("max_price");
+            return new LongRangeDto(min, max);
+        }, regionCode);
+    }
+
+    /**
      * fullCode와 범위 조건으로 토지 목록 조회
      */
-    public Long countLandsByFullCode(FullCodeLandSearchQuery query) {
+    public Long countLandsByFullCode(FullCodeLandCountQuery query) {
         int fullCodeLength = query.fullCode().length();
         String leftQuery = "LEFT(full_code, " + fullCodeLength + ") = ? ";
 
@@ -278,7 +337,7 @@ public class LandDao {
         List<Object> params = new ArrayList<>();
         params.add(query.fullCode());
 
-        SqlConditionUtils.eq(sql, params, "use_zone_category", query.useZoneCategories());
+        SqlConditionUtils.in(sql, params, "use_zone_category", query.useZoneCategories());
 
         // 토지 면적 필터
         SqlConditionUtils.between(sql, params,
@@ -299,39 +358,61 @@ public class LandDao {
     }
     
     /**
-     * fullCode와 범위 조건으로 토지 목록 조회
+     * fullCode와 범위 조건으로 토지 목록 조회 (전체 데이터를 2000건씩 페이지네이션)
      */
     public List<Land> findLandsByFullCode(FullCodeLandSearchQuery query) {
         int fullCodeLength = query.fullCode().length();
         String leftQuery = "LEFT(full_code, " + fullCodeLength + ") = ? ";
         
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT * ")
-           .append("FROM land WHERE ").append(leftQuery);
+        List<Land> allResults = new ArrayList<>();
+        Long lastId = 0L;
+        int batchSize = 2000;
+        
+        while (true) {
+            StringBuilder sql = new StringBuilder();
+            sql.append("SELECT * ")
+               .append("FROM land WHERE ").append(leftQuery)
+               .append(" AND id > ? ");
 
-        List<Object> params = new ArrayList<>();
-        params.add(query.fullCode());
+            List<Object> params = new ArrayList<>();
+            params.add(query.fullCode());
+            params.add(lastId);
 
-        SqlConditionUtils.eq(sql, params, "use_zone_category", query.useZoneCategories());
+            SqlConditionUtils.eq(sql, params, "use_zone_category", query.useZoneCategories());
 
-        // 토지 면적 필터
-        SqlConditionUtils.between(sql, params,
-                "land_area",
-                BigDecimal.valueOf(query.landAreaMin()),
-                BigDecimal.valueOf(query.landAreaMax()));
+            // 토지 면적 필터
+            SqlConditionUtils.between(sql, params,
+                    "land_area",
+                    BigDecimal.valueOf(query.landAreaMin()),
+                    BigDecimal.valueOf(query.landAreaMax()));
 
-        // 공시지가 필터
-        SqlConditionUtils.between(sql, params,
-                "official_land_price",
-                BigDecimal.valueOf(query.officialLandPriceMin()),
-                BigDecimal.valueOf(query.officialLandPriceMax()));
+            // 공시지가 필터
+            SqlConditionUtils.between(sql, params,
+                    "official_land_price",
+                    BigDecimal.valueOf(query.officialLandPriceMin()),
+                    BigDecimal.valueOf(query.officialLandPriceMax()));
 
-        // 제외할 토지 이용 코드 필터링
-        sql.append(" AND land_use_code NOT IN (910, 920, 930, 940, 950, 960, 970, 990, 850, 860, 870, 880, 881, 890, 891, 892, 893)");
+            // 제외할 토지 이용 코드 필터링
+            sql.append(" AND land_use_code NOT IN (910, 920, 930, 940, 950, 960, 970, 990, 850, 860, 870, 880, 881, 890, 891, 892, 893)");
+            
+            sql.append(" ORDER BY id LIMIT ?");
+            params.add(batchSize);
 
-        sql.append(" LIMIT 500");
-
-        return jdbcTemplate.query(sql.toString(), new LandRowMapper(), params.toArray());
+            List<Land> batchResults = jdbcTemplate.query(sql.toString(), new LandRowMapper(), params.toArray());
+            
+            if (batchResults.isEmpty()) {
+                break;
+            }
+            
+            allResults.addAll(batchResults);
+            lastId = batchResults.get(batchResults.size() - 1).getId();
+            
+            if (batchResults.size() < batchSize) {
+                break;
+            }
+        }
+        
+        return allResults;
     }
 
     /**

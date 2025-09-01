@@ -26,4 +26,9 @@ public interface LandDataRangeAdapter {
      * 재난문자 발송 건수 범위 조회
      */
     AnalysisRangeDto getDisasterCountRange();
+
+    /**
+     * 전기요금 범위 조회
+     */
+    AnalysisRangeDto getElectricBillRange();
 }

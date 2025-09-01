@@ -80,37 +80,37 @@ public class LandAnalysisService {
         // 4. 배치 단위로 토지별 점수 계산
         List<LandScoreItem> landScoreItems = new ArrayList<>();
         final int BATCH_SIZE = 1000;
-        
+
         for (int i = 0; i < lands.size(); i += BATCH_SIZE) {
             int endIndex = Math.min(i + BATCH_SIZE, lands.size());
             List<Land> landBatch = lands.subList(i, endIndex);
-            
+
             log.info("배치 처리 중: {}/{} (배치 크기: {})", i + landBatch.size(), lands.size(), landBatch.size());
-            
+
             // 배치 단위로 전력 인프라 정보 조회
             List<Long> landIds = landBatch.stream().map(Land::getId).toList();
-            List<LandPowerInfrastructureSummary> powerInfraSummaries = 
+            List<LandPowerInfrastructureSummary> powerInfraSummaries =
                     powerInfrastructureDao.findByLandIds(landIds);
-            
+
             // landId를 키로 하는 Map으로 변환 (빠른 조회를 위해)
             Map<Long, LandPowerInfrastructureSummary> powerInfraMap = powerInfraSummaries.stream()
                     .collect(Collectors.toMap(
-                            LandPowerInfrastructureSummary::getLandId, 
+                            LandPowerInfrastructureSummary::getLandId,
                             summary -> summary));
-            
+
             // 배치 내 각 토지별 점수 계산
             for (Land land : landBatch) {
                 LandPowerInfrastructureSummary powerInfraSummary = powerInfraMap.get(land.getId());
-                
+
                 // LandAnalysisData 구성
                 LandAnalysisData analysisData = LandAnalysisData.builder()
                         .land(land)
                         .electricityCostInfo(areaDetails.electricityCostInfo())
                         .emergencyTextInfo(areaDetails.emergencyTextInfo())
                         .populationInfo(areaDetails.populationInfo())
-                        .substationCount(powerInfraSummary != null ? powerInfraSummary.getSubstationCount() : null)
-                        .transmissionTowerCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionTowerCount() : null)
-                        .transmissionLineCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionLineCount() : null)
+                        .substationCount(powerInfraSummary != null ? powerInfraSummary.getSubstationCount() : 0)
+                        .transmissionTowerCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionTowerCount() : 0)
+                        .transmissionLineCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionLineCount() : 0)
                         .statisticsRanges(statisticsRanges)
                         .categoryNormalizedWeights(categoryNormalizedWeights)
                         .globalNormalizedWeights(globalNormalizedWeights)
@@ -249,11 +249,17 @@ public class LandAnalysisService {
         if (request.getLandPriceRange() != null) {
             map.put(AnalysisStatisticsType.OFFICIAL_LAND_PRICE, request.getLandPriceRange());
         }
+
         if (request.getElectricityCostRange() != null) {
-            map.put(AnalysisStatisticsType.ELECTRICITY_COST, request.getElectricityCostRange());
+            map.put(AnalysisStatisticsType.ELECTRICITY_COST,
+                    convertToWeightedRange(request.getElectricityCostRange(), landDataRangeAdapter.getElectricBillRange()));
         }
 
         // 선택 지표들은 null이 아닐 때만 추가 (사용자 요청에 없을 경우 어댑터를 통해 기본값 조회)
+        if (request.getPopulationDensityRange() != null) {
+            map.put(AnalysisStatisticsType.POPULATION_DENSITY, request.getPopulationDensityRange());
+        }
+
         if (request.getSubstationCountRange() != null) {
             map.put(AnalysisStatisticsType.SUBSTATION_COUNT,
                     convertToWeightedRange(request.getSubstationCountRange(), landDataRangeAdapter.getSubstationCountRange()));

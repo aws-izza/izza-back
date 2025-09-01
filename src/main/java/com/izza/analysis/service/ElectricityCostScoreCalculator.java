@@ -13,7 +13,10 @@ public class ElectricityCostScoreCalculator extends AbstractNormalizedScoreCalcu
     
     @Override
     protected double getActualValue(LandAnalysisData data) {
-        return data.getElectricityCostInfo().unitCost().doubleValue();
+        if(data.getElectricityCostInfo() != null) {
+            return data.getElectricityCostInfo().unitCost().doubleValue();
+        }
+        return 170.0;
     }
 
     @Override

@@ -3,12 +3,16 @@ package com.izza.search.service;
 import com.izza.exception.BusinessException;
 import com.izza.search.persistent.dao.BeopjungDongDao;
 import com.izza.search.persistent.dao.ElectricityCostDao;
+import com.izza.search.persistent.dao.LandDao;
 import com.izza.search.persistent.dao.LandStatisticsDao;
+import com.izza.search.persistent.dto.query.FullCodeLandCountQuery;
+import com.izza.search.persistent.dto.query.FullCodeLandSearchQuery;
 import com.izza.search.persistent.model.BeopjungDong;
 import com.izza.search.persistent.model.ElectricityCost;
 import com.izza.search.persistent.model.LandStatistics;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.presentation.dto.response.RegionResponse;
+import com.izza.utils.LongRangeUtils;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -34,6 +38,7 @@ public class LandDataRangeService {
     private final LandStatisticsDao landStatisticsDao;
     private final ElectricityCostDao electricityCostDao;
     private final BeopjungDongDao beopjungDongDao;
+    private final LandDao landDao;
 
 
     public LongRangeDto getLandAreaRange() {
@@ -75,6 +80,30 @@ public class LandDataRangeService {
 
     public LongRangeDto getDisasterCountRange() {
         return getRange(DISASTER_COUNT_RANGE_TYPE);
+    }
+
+    public LongRangeDto getLandAreaRangeByRegion(String regionCode) {
+        LongRangeDto rawRange = landDao.getLandAreaRangeByRegion(regionCode.substring(0,5));
+        return LongRangeUtils.normalizeAreaRange(rawRange.min(), rawRange.max());
+    }
+
+    public LongRangeDto getOfficialLandPriceRangeByRegion(String regionCode) {
+        LongRangeDto rawRange = landDao.getOfficialLandPriceRangeByRegion((regionCode.substring(0,5)));
+        return LongRangeUtils.normalizePriceRange(rawRange.min(), rawRange.max());
+    }
+
+    public Long countLandsByFullCode(String fullCode, String useZoneCategory, Long landAreaMin, Long landAreaMax, Long officialLandPriceMin, Long officialLandPriceMax) {
+        List<String> useCategories = List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT");
+
+        FullCodeLandCountQuery query = new FullCodeLandCountQuery(
+            fullCode.substring(0, 5),
+            landAreaMin,
+            landAreaMax,
+            officialLandPriceMin,
+            officialLandPriceMax,
+            useZoneCategory != null ? List.of(useZoneCategory) : useCategories
+        );
+        return landDao.countLandsByFullCode(query);
     }
 
     public List<RegionResponse> getRegionsByFullCode(String fullCode) {

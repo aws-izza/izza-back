@@ -28,23 +28,29 @@ public class BaseInfoController {
     @GetMapping("/land-area-range")
     @Operation(summary = "토지 면적 범위 조회",
             description = "전체 토지의 면적 최소값과 최대값을 조회합니다. 소수점은 올림 처리됩니다.")
-    public BaseApiResponse<LongRangeDto> getLandAreaRange() {
+    public BaseApiResponse<LongRangeDto> getLandAreaRange(@RequestParam(required = false) String regionCode) {
+        if (regionCode != null) {
+            return BaseApiResponse.ok(landDataRangeService.getLandAreaRangeByRegion(regionCode));
+        }
         return BaseApiResponse.ok(landDataRangeService.getLandAreaRange());
     }
 
     @GetMapping("/official-land-price-range")
     @Operation(summary = "공시지가 범위 조회",
             description = "전체 토지의 공시지가 최소값과 최대값을 조회합니다.")
-    public BaseApiResponse<LongRangeDto> getOfficialLandPriceRange() {
+    public BaseApiResponse<LongRangeDto> getOfficialLandPriceRange(@RequestParam(required = false) String regionCode) {
+        if (regionCode != null) {
+            return BaseApiResponse.ok(landDataRangeService.getOfficialLandPriceRangeByRegion(regionCode));
+        }
         return BaseApiResponse.ok(landDataRangeService.getOfficialLandPriceRange());
     }
 
-        @GetMapping("/electric-bill-range")
-        @Operation(summary = "전기요금 범위 조회",
-                description = "전체 토지의 전기요금 최소값과 최대값을 조회합니다.")
-        public BaseApiResponse<LongRangeDto> getElectricBillRange(@RequestParam(required = false) String fullCode) {
-            return BaseApiResponse.ok(landDataRangeService.getElectricBillRange(fullCode));
-        }
+    @GetMapping("/electric-bill-range")
+    @Operation(summary = "전기요금 범위 조회",
+            description = "전체 토지의 전기요금 최소값과 최대값을 조회합니다.")
+    public BaseApiResponse<LongRangeDto> getElectricBillRange(@RequestParam(required = false) String fullCode) {
+        return BaseApiResponse.ok(landDataRangeService.getElectricBillRange(fullCode));
+    }
 
 
     @GetMapping("/regions")
@@ -64,5 +70,20 @@ public class BaseInfoController {
                 .toList();
 
         return BaseApiResponse.ok(categories);
+    }
+
+    @GetMapping("/lands/count")
+    @Operation(summary = "지역별 토지 개수 조회",
+            description = "지역코드와 조건에 따른 토지 개수를 조회합니다.")
+    public BaseApiResponse<Long> countLandsByFullCode(
+            @RequestParam(required = false) String fullCode,
+            @RequestParam(required = false) String useZoneCategory,
+            @RequestParam(required = false) Long landAreaMin,
+            @RequestParam(required = false) Long landAreaMax,
+            @RequestParam(required = false) Long officialLandPriceMin,
+            @RequestParam(required = false) Long officialLandPriceMax) {
+        return BaseApiResponse.ok(landDataRangeService.countLandsByFullCode(
+            fullCode, useZoneCategory, landAreaMin, landAreaMax, officialLandPriceMin, officialLandPriceMax
+        ));
     }
 }
