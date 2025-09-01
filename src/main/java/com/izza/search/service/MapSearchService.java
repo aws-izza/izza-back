@@ -107,6 +107,19 @@ public class MapSearchService {
 
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
+        // 법정동이 20개 이상이면 ZoomLevel을 한 단계 상승시켜 다시 조회
+        if (beopjeongDongs.size() >= 20) {
+            ZoomLevel higherZoomLevel = getHigherZoomLevel(zoomLevel);
+            if (higherZoomLevel != null) {
+                MapSearchQuery higherMapSearchQuery = new MapSearchQuery(
+                        higherZoomLevel,
+                        new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
+                        new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat()));
+                beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(higherMapSearchQuery);
+                zoomLevel = higherZoomLevel;
+            }
+        }
+
         BeopjungDongType beopjungDongType = BeopjungDongType.valueOf(zoomLevel.getType());
         List<String> fullCodePrefixes = beopjeongDongs.stream()
                 .map(dong -> dong.getFullCode().substring(0, beopjungDongType.getCodeLength()))
@@ -128,6 +141,15 @@ public class MapSearchService {
         }
 
         return zipFrom(beopjeongDongs, landCountQueryResults);
+    }
+
+    private ZoomLevel getHigherZoomLevel(ZoomLevel currentLevel) {
+        return switch (currentLevel) {
+            case EMD -> ZoomLevel.SIG;
+            case SIG -> ZoomLevel.SIDO;
+            case SIDO -> ZoomLevel.SIDO;
+            case LAND -> ZoomLevel.EMD;
+        };
     }
 
     private List<LandGroupSearchResponse> zipFrom(
