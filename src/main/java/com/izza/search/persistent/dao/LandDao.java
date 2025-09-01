@@ -87,6 +87,92 @@ public class LandDao {
 
         int prefixLength = query.fullCodePrefixes().getFirst().length();
 
+        // 시도 레벨(길이 2)일 때 prefix sum 테이블 사용
+        if (prefixLength == 2) {
+            return countLandsByRegionsWithPrefixSum(query);
+        }
+
+        // 기존 로직 (길이 2가 아닌 경우)
+        return countLandsByRegionsLegacy(query);
+    }
+
+    private List<LandCountQueryResult> countLandsByRegionsWithPrefixSum(CountLandQuery query) {
+        int areaBucketMin = (int) (query.landAreaMin() / 500);
+        int areaBucketMax = (int) (query.landAreaMax() / 500);
+        int priceBucketMin = (int) (query.officialLandPriceMin() / 500000);
+        int priceBucketMax = (int) (query.officialLandPriceMax() / 500000);
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("""
+                SELECT \s
+                    key_prefix as region_code,
+                    SUM(land_count) as land_count \s
+                FROM (
+                    SELECT \s
+                        p1.key_prefix,
+                        COALESCE(p1.cumulative_count, 0) - 
+                        COALESCE(p2.cumulative_count, 0) - 
+                        COALESCE(p3.cumulative_count, 0) + 
+                        COALESCE(p4.cumulative_count, 0) as land_count \s
+                    FROM land_statistics_prefix_sum p1
+                    LEFT JOIN land_statistics_prefix_sum p2 ON (
+                        p2.key_prefix = p1.key_prefix
+                        AND p2.use_zone_category = p1.use_zone_category
+                        AND p2.area_bucket = ? - 1 
+                        AND p2.price_bucket = ?
+                    )
+                    LEFT JOIN land_statistics_prefix_sum p3 ON (
+                        p3.key_prefix = p1.key_prefix
+                        AND p3.use_zone_category = p1.use_zone_category
+                        AND p3.area_bucket = ? 
+                        AND p3.price_bucket = ? - 1
+                    )
+                    LEFT JOIN land_statistics_prefix_sum p4 ON (
+                        p4.key_prefix = p1.key_prefix
+                        AND p4.use_zone_category = p1.use_zone_category
+                        AND p4.area_bucket = ? - 1 
+                        AND p4.price_bucket = ? - 1
+                    )
+                    WHERE p1.key_prefix IN (%s) \s
+                    AND p1.use_zone_category IN (%s) \s
+                    AND p1.area_bucket = ? \s
+                    AND p1.price_bucket = ? \s
+                ) subquery
+                GROUP BY key_prefix \s
+                """);
+
+        String keyPrefixPlaceholders = query.fullCodePrefixes().stream()
+                .map(s -> "?")
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+        
+        String useZonePlaceholders = query.useZoneCategories().stream()
+                .map(s -> "?")
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+
+        String finalSql = String.format(sql.toString(), keyPrefixPlaceholders, useZonePlaceholders);
+
+        List<Object> params = new ArrayList<>();
+        params.add(areaBucketMin);
+        params.add(areaBucketMax);
+        params.add(areaBucketMax);
+        params.add(priceBucketMin);
+        params.add(areaBucketMin);
+        params.add(priceBucketMin);
+        params.addAll(query.fullCodePrefixes());
+        params.addAll(query.useZoneCategories());
+        params.add(areaBucketMax);
+        params.add(priceBucketMax);
+
+        return jdbcTemplate.query(finalSql, (rs, rowNum) -> new LandCountQueryResult(
+                rs.getString("region_code"),
+                rs.getLong("land_count")), params.toArray());
+    }
+
+    private List<LandCountQueryResult> countLandsByRegionsLegacy(CountLandQuery query) {
+        int prefixLength = query.fullCodePrefixes().getFirst().length();
+
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
@@ -111,19 +197,11 @@ public class LandDao {
                     BigDecimal.valueOf(query.officialLandPriceMin()),
                     BigDecimal.valueOf(query.officialLandPriceMax()));
 
-            // 제외할 토지 이용 코드 필터링
-//            sql.append(" AND land_use_code NOT IN (910, 920, 930, 940, 950, 960, 970, 990, 850, 860, 870, 880, 881, 890, 891, 892, 893)");
-
             sql.append(" GROUP BY ").append(leftQuery);
-
-            System.out.println(sql);
-            System.out.println(params);
 
             List<LandCountQueryResult> queryResult = jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new LandCountQueryResult(
                     rs.getString("region_code"),
                     rs.getLong("land_count")), params.toArray());
-
-
 
             for (LandCountQueryResult result : queryResult) {
                 Long value = map.getOrDefault(result.beopjungDongCodePrefix(), 0L);
@@ -131,12 +209,8 @@ public class LandDao {
                 map.put(result.beopjungDongCodePrefix(), value);
             }
 
-
-
             sql = new StringBuilder();
             params.clear();
-
-
         }
 
         List<LandCountQueryResult> results = new ArrayList<>();
@@ -145,7 +219,6 @@ public class LandDao {
             Long value = entry.getValue();
             results.add(new LandCountQueryResult(key, value));
         }
-
 
         return results;
     }
