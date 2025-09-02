@@ -416,6 +416,34 @@ public class LandDao {
     }
 
     /**
+     * ID 목록으로 토지 상세 정보 일괄 조회 - land_gis와 JOIN
+     */
+    public List<Land> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        StringBuilder sql = new StringBuilder();
+        sql.append("""
+                SELECT l.*,
+                ST_AsText(lg.boundary) as boundary_wkt,
+                ST_X(lg.center_point) as center_lng,
+                ST_Y(lg.center_point) as center_lat
+                FROM land l
+                LEFT JOIN land_gis lg ON l.id = lg.land_id
+                WHERE l.id IN (
+                """);
+        
+        for (int i = 0; i < ids.size(); i++) {
+            if (i > 0) sql.append(",");
+            sql.append("?");
+        }
+        sql.append(")");
+        
+        return jdbcTemplate.query(sql.toString(), new LandRowMapper(), ids.toArray());
+    }
+
+    /**
      * 주소로 토지 검색 (정확히 일치)
      */
     public Optional<Land> findByAddress(String address) {

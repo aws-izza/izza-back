@@ -15,7 +15,10 @@ import java.util.List;
 @Builder
 @Schema(description = "토지 분석 요청")
 public class LandAnalysisRequest {
-    
+
+    @Schema(description = "찜 토지 아이디 목록")
+    private List<String> starLandIds;
+
     @Schema(description = "법정동 코드", example = "11676000")
     private String fullCode;
     

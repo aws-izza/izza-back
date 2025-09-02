@@ -30,6 +30,12 @@ public class DisasterCountScoreCalculator implements ScoreCalculator {
     @Override
     public ScoreResult calculateScore(LandAnalysisData data) {
         // 1. 실제 값 가져오기 (재난문자 발송 건수)
+        AnalysisStatisticsType statisticsType = getStatisticsType();
+        if (!data.getStatisticsRanges().containsKey(statisticsType)) {
+            return null;
+        }
+
+
         double actualValue = data.getEmergencyTextInfo().totalDisasterCount();
         
         // 2. 통계 범위 가져오기
@@ -41,7 +47,6 @@ public class DisasterCountScoreCalculator implements ScoreCalculator {
         double originalScore = calculateReverseNormalizedScore(actualValue, min, max);
         
         // 4. 가중치 적용
-        AnalysisStatisticsType statisticsType = getStatisticsType();
         Double categoryWeight = data.getCategoryNormalizedWeights().get(statisticsType);
         Double globalWeight = data.getGlobalNormalizedWeights().get(statisticsType);
         

@@ -28,6 +28,12 @@ public class PopulationDensityScoreCalculator implements ScoreCalculator {
 
     @Override
     public ScoreResult calculateScore(LandAnalysisData data) {
+        // 0. statisticsRanges에 해당 타입이 없으면 점수 계산하지 않음
+        AnalysisStatisticsType statisticsType = getStatisticsType();
+        if (!data.getStatisticsRanges().containsKey(statisticsType)) {
+            return null;
+        }
+        
         // 1. 실제 값 가져오기 (인구밀도)
         double actualValue = data.getPopulationInfo().getMiddleAgedPopulation();
 
@@ -45,7 +51,6 @@ public class PopulationDensityScoreCalculator implements ScoreCalculator {
         double originalScore = calculateDeviationBasedScore(actualValue, standardDensity, allowedDeviation);
 
         // 4. 가중치 적용
-        AnalysisStatisticsType statisticsType = getStatisticsType();
         Double categoryWeight = data.getCategoryNormalizedWeights().get(statisticsType);
         Double globalWeight = data.getGlobalNormalizedWeights().get(statisticsType);
 

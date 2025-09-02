@@ -95,6 +95,19 @@ public class LandDataRangeService {
     public Long countLandsByFullCode(String fullCode, String useZoneCategory, Long landAreaMin, Long landAreaMax, Long officialLandPriceMin, Long officialLandPriceMax) {
         List<String> useCategories = List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT");
 
+        // null 값들에 대해 기본값 설정
+        if (landAreaMin == null || landAreaMax == null) {
+            LongRangeDto landAreaRange = getLandAreaRange();
+            landAreaMin = landAreaMin != null ? landAreaMin : landAreaRange.min();
+            landAreaMax = landAreaMax != null ? landAreaMax : landAreaRange.max();
+        }
+        
+        if (officialLandPriceMin == null || officialLandPriceMax == null) {
+            LongRangeDto priceRange = getOfficialLandPriceRange();
+            officialLandPriceMin = officialLandPriceMin != null ? officialLandPriceMin : priceRange.min();
+            officialLandPriceMax = officialLandPriceMax != null ? officialLandPriceMax : priceRange.max();
+        }
+
         FullCodeLandCountQuery query = new FullCodeLandCountQuery(
             fullCode.substring(0, 5),
             landAreaMin,

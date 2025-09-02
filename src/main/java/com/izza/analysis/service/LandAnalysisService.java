@@ -14,6 +14,7 @@ import com.izza.analysis.vo.IndustryType;
 import com.izza.analysis.vo.WeightedStatisticsRange;
 import com.izza.search.persistent.model.Land;
 import com.izza.search.service.MapSearchService;
+import com.izza.search.persistent.dao.LandDao;
 import com.izza.search.presentation.dto.request.LandSearchFilterRequest;
 import com.izza.search.presentation.dto.response.AreaDetailResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class LandAnalysisService {
 
     private final MapSearchService mapSearchService;
     private final LandPowerInfrastructureSummaryDao powerInfrastructureDao;
+    private final LandDao landDao;
     private final List<ScoreCalculator> scoreCalculators;
     private final WeightCalculator weightCalculator;
     private final LandDataRangeAdapter landDataRangeAdapter;
@@ -57,17 +59,36 @@ public class LandAnalysisService {
      * @return 토지 점수 순위 응답
      */
     public LandScoreRankingResponse analyzeLandRanking(LandAnalysisRequest request) {
-        String fullCode = request.getFullCode();
-        if (fullCode == null || fullCode.isEmpty()) {
-            throw new IllegalArgumentException("fullCode는 필수 파라미터입니다.");
+        // 1. 토지 목록 조회 
+        List<Land> lands = new ArrayList<>();
+        Set<Long> starLandIdSet = new HashSet<>();
+        
+        // 찜 토지가 있으면 우선 조회
+        if (request.getStarLandIds() != null && !request.getStarLandIds().isEmpty()) {
+            List<Long> starLandIds = request.getStarLandIds().stream()
+                    .map(Long::parseLong)
+                    .toList();
+            starLandIdSet.addAll(starLandIds);
+            List<Land> starLands = landDao.findByIds(starLandIds);
+            lands.addAll(starLands);
+            log.info("찜 토지 조회 완료: {}", starLands.size());
+        }
+        
+        // fullCode 기반 검색 (찜 토지와 중복 제거)
+        if (request.getFullCode() != null && !request.getFullCode().isEmpty()) {
+            List<Land> searchedLands = searchLandsByCondition(request);
+            List<Land> filteredLands = searchedLands.stream()
+                    .filter(land -> !starLandIdSet.contains(land.getId()))
+                    .toList();
+            lands.addAll(filteredLands);
+            log.info("검색된 토지 수: {}, fullCode: {}, 중복 제거 후: {}", 
+                    searchedLands.size(), request.getFullCode(), filteredLands.size());
+        } else if (starLandIdSet.isEmpty()) {
+            throw new IllegalArgumentException("fullCode 또는 starLandIds 중 하나는 필수입니다.");
         }
 
-        // 1. 검색 조건으로 토지 목록 조회
-        List<Land> lands = searchLandsByCondition(request);
-        log.info("검색된 토지 수: {}, fullCode: {}", lands.size(), fullCode);
-
-        // 2. 행정구역 상세 정보 조회 (한 번만)
-        AreaDetailResponse areaDetails = mapSearchService.getAreaDetailsByFullCode(fullCode);
+        // 2. 행정구역 상세 정보 조회 (fullCode 5자리 prefix별로 집계)
+        Map<String, AreaDetailResponse> areaDetailsMap = getAreaDetailsByPrefixes(lands);
 
         // 3. 가중치 맵 미리 계산
         Map<AnalysisStatisticsType, WeightedStatisticsRange> statisticsRanges =
@@ -102,12 +123,19 @@ public class LandAnalysisService {
             for (Land land : landBatch) {
                 LandPowerInfrastructureSummary powerInfraSummary = powerInfraMap.get(land.getId());
 
+                // 토지에 해당하는 행정구역 정보 조회 (fullCode 5자리 prefix 기준)
+                String landFullCode = land.getBeopjungDongCode();
+                String prefix5 = landFullCode != null && landFullCode.length() >= 5 
+                    ? landFullCode.substring(0, 5) 
+                    : landFullCode;
+                AreaDetailResponse areaDetails = areaDetailsMap.get(prefix5);
+
                 // LandAnalysisData 구성
                 LandAnalysisData analysisData = LandAnalysisData.builder()
                         .land(land)
-                        .electricityCostInfo(areaDetails.electricityCostInfo())
-                        .emergencyTextInfo(areaDetails.emergencyTextInfo())
-                        .populationInfo(areaDetails.populationInfo())
+                        .electricityCostInfo(areaDetails != null ? areaDetails.electricityCostInfo() : null)
+                        .emergencyTextInfo(areaDetails != null ? areaDetails.emergencyTextInfo() : null)
+                        .populationInfo(areaDetails != null ? areaDetails.populationInfo() : null)
                         .substationCount(powerInfraSummary != null ? powerInfraSummary.getSubstationCount() : 0)
                         .transmissionTowerCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionTowerCount() : 0)
                         .transmissionLineCount(powerInfraSummary != null ? powerInfraSummary.getTransmissionLineCount() : 0)
@@ -123,6 +151,7 @@ public class LandAnalysisService {
                 double totalScore = calculateTotalScoreFromResults(scoreResults, analysisData);
 
                 // LandScoreItem 생성
+                boolean isStarred = starLandIdSet.contains(land.getId());
                 LandScoreItem item = LandScoreItem.builder()
                         .landId(land.getId())
                         .address(land.getAddress())
@@ -131,19 +160,32 @@ public class LandAnalysisService {
                         .totalScore(totalScore)
                         .categoryScores(convertToCategoryScoreDetails(scoreResults))
                         .globalScores(convertToGlobalScoreDetails(scoreResults))
+                        .isStarred(isStarred)
                         .build();
 
                 landScoreItems.add(item);
             }
         }
 
-        // 5. 점수 내림차순 정렬
+        // 5. 점수 내림차순 정렬 및 순위 설정
         landScoreItems.sort((a, b) -> Double.compare(b.getTotalScore(), a.getTotalScore()));
-        List<LandScoreItem> topRanked = landScoreItems.subList(0, 10);
+        for (int i = 0; i < landScoreItems.size(); i++) {
+            landScoreItems.get(i).setRank(i + 1);
+        }
+        
+        // 6. 찜토지 목록과 상위 20위 목록 분리
+        List<LandScoreItem> starredLands = landScoreItems.stream()
+            .filter(LandScoreItem::isStarred)
+            .toList();
+            
+        List<LandScoreItem> top20Lands = landScoreItems.size() > 20 
+            ? landScoreItems.subList(0, 20) 
+            : landScoreItems;
 
-        // 6. 응답 객체 구성
+        // 7. 응답 객체 구성
         return LandScoreRankingResponse.builder()
-                .landScores(topRanked)
+                .starredLands(starredLands)
+                .topRankedLands(top20Lands)
                 .build();
     }
 
@@ -193,6 +235,35 @@ public class LandAnalysisService {
     }
 
     /**
+     * 토지 목록에서 fullCode 5자리 prefix를 추출하여 행정구역 상세 정보 조회
+     */
+    private Map<String, AreaDetailResponse> getAreaDetailsByPrefixes(List<Land> lands) {
+        // fullCode 5자리 prefix 추출
+        Set<String> prefix5Set = lands.stream()
+                .map(Land::getBeopjungDongCode)
+                .filter(Objects::nonNull)
+                .filter(code -> code.length() >= 5)
+                .map(code -> code.substring(0, 5))
+                .collect(Collectors.toSet());
+
+        Map<String, AreaDetailResponse> areaDetailsMap = new HashMap<>();
+        
+        // 각 prefix별로 행정구역 상세 정보 조회
+        for (String prefix5 : prefix5Set) {
+            try {
+                AreaDetailResponse areaDetails = mapSearchService.getAreaDetailsByFullCode(prefix5);
+                areaDetailsMap.put(prefix5, areaDetails);
+                log.debug("행정구역 정보 조회 완료: prefix5={}", prefix5);
+            } catch (Exception e) {
+                log.warn("행정구역 정보 조회 실패: prefix5={}, error={}", prefix5, e.getMessage());
+            }
+        }
+        
+        log.info("행정구역 정보 조회 완료. 총 {}개 prefix", areaDetailsMap.size());
+        return areaDetailsMap;
+    }
+
+    /**
      * 점수 계산 (모든 ScoreCalculator 구현체 순회하여 계산)
      */
     private Map<AnalysisStatisticsType, ScoreResult> calculateScores(LandAnalysisData analysisData) {
@@ -202,6 +273,9 @@ public class LandAnalysisService {
         for (ScoreCalculator calculator : scoreCalculators) {
             try {
                 ScoreResult scoreResult = calculator.calculateScore(analysisData);
+                if(scoreResult == null) {
+                    continue;
+                }
                 AnalysisStatisticsType statisticsType = scoreResult.getStatisticsType();
                 scoreResults.put(statisticsType, scoreResult);
 

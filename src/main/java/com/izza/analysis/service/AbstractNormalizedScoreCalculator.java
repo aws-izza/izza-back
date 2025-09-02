@@ -12,11 +12,19 @@ public abstract class AbstractNormalizedScoreCalculator implements ScoreCalculat
     
     @Override
     public final ScoreResult calculateScore(LandAnalysisData data) {
+        // 0. statisticsRanges에 해당 타입이 없으면 점수 계산하지 않음
+        AnalysisStatisticsType statisticsType = getStatisticsType();
+
+        if (!data.getStatisticsRanges().containsKey(statisticsType)) {
+            return null;
+        }
+
+
         // 1. 각 구현체에서 실제 값을 가져옴
         double actualValue = getActualValue(data);
         
         // 2. 통계 범위 가져오기
-        var statisticsRange = data.getStatisticsRanges().get(getStatisticsType());
+        var statisticsRange = data.getStatisticsRanges().get(statisticsType);
         long min = statisticsRange.min();
         long max = statisticsRange.max();
         
@@ -24,7 +32,6 @@ public abstract class AbstractNormalizedScoreCalculator implements ScoreCalculat
         double originalScore = calculateNormalizedScore(actualValue, min, max);
         
         // 4. 가중치 적용
-        AnalysisStatisticsType statisticsType = getStatisticsType();
         Double categoryWeight = data.getCategoryNormalizedWeights().get(statisticsType);
         Double globalWeight = data.getGlobalNormalizedWeights().get(statisticsType);
         

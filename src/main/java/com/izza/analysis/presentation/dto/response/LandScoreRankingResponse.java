@@ -16,6 +16,9 @@ import java.util.List;
 @Schema(description = "토지 점수 순위 응답")
 public class LandScoreRankingResponse {
 
-    @Schema(description = "분석된 토지 목록 (점수 내림차순 정렬)")
-    private List<LandScoreItem> landScores;
+    @Schema(description = "찜 토지 목록")
+    private List<LandScoreItem> starredLands;
+    
+    @Schema(description = "상위 20위 토지 목록 (점수 내림차순 정렬)")
+    private List<LandScoreItem> topRankedLands;
 }
