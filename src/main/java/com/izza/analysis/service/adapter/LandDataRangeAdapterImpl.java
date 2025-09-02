@@ -17,6 +17,18 @@ public class LandDataRangeAdapterImpl implements LandDataRangeAdapter {
     private final LandDataRangeService landDataRangeService;
 
     @Override
+    public AnalysisRangeDto getLandAreaRange() {
+        LongRangeDto searchDto = landDataRangeService.getLandAreaRange();
+        return convertToAnalysisRangeDto(searchDto);
+    }
+
+    @Override
+    public AnalysisRangeDto getLandPriceRange() {
+        LongRangeDto searchDto = landDataRangeService.getOfficialLandPriceRange();
+        return convertToAnalysisRangeDto(searchDto);
+    }
+
+    @Override
     public AnalysisRangeDto getSubstationCountRange() {
         LongRangeDto searchDto = landDataRangeService.getSubstitutionCountRange();
         return convertToAnalysisRangeDto(searchDto);

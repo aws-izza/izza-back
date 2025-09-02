@@ -8,6 +8,16 @@ import com.izza.analysis.presentation.dto.AnalysisRangeDto;
 public interface LandDataRangeAdapter {
 
     /**
+     * 토지 면적 범위 조회
+     */
+    AnalysisRangeDto getLandAreaRange();
+
+    /**
+     * 공시지가 범위 조회
+     */
+    AnalysisRangeDto getLandPriceRange();
+
+    /**
      * 변전소 개수 범위 조회
      */
     AnalysisRangeDto getSubstationCountRange();

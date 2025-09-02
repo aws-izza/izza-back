@@ -139,10 +139,11 @@ public class LandAnalysisService {
 
         // 5. 점수 내림차순 정렬
         landScoreItems.sort((a, b) -> Double.compare(b.getTotalScore(), a.getTotalScore()));
+        List<LandScoreItem> topRanked = landScoreItems.subList(0, 10);
 
         // 6. 응답 객체 구성
         return LandScoreRankingResponse.builder()
-                .landScores(landScoreItems)
+                .landScores(topRanked)
                 .build();
     }
 
@@ -152,13 +153,35 @@ public class LandAnalysisService {
      */
     private List<Land> searchLandsByCondition(LandAnalysisRequest request) {
         // TODO: MSA 구조 변경 시 다른 도메인(search)과의 통신을 위해 인터페이스로 분리 필요
+        long landAreaMin;
+        long landAreaMax;
+        long officialLandPriceMin;
+        long officialLandPriceMax;
+
+        if (request.getLandAreaRange() != null) {
+            landAreaMin = request.getLandAreaRange().min();
+            landAreaMax = request.getLandAreaRange().max();
+        } else {
+            AnalysisRangeDto landAreaRange = landDataRangeAdapter.getLandAreaRange();
+            landAreaMin = landAreaRange.min();
+            landAreaMax = landAreaRange.max();
+        }
+
+        if (request.getLandPriceRange() != null) {
+            officialLandPriceMin = request.getLandPriceRange().min();
+            officialLandPriceMax = request.getLandPriceRange().max();
+        } else {
+            AnalysisRangeDto landPriceRange = landDataRangeAdapter.getLandPriceRange();
+            officialLandPriceMin = landPriceRange.min();
+            officialLandPriceMax = landPriceRange.max();
+        }
 
         // LandSearchFilterRequest 구성 (null 체크 없이 직접 전달)
         LandSearchFilterRequest filterRequest = new LandSearchFilterRequest(
-                request.getLandAreaRange().min(),
-                request.getLandAreaRange().max(),
-                request.getLandPriceRange().min(),
-                request.getLandPriceRange().max(),
+                landAreaMin,
+                landAreaMax,
+                officialLandPriceMin,
+                officialLandPriceMax,
                 request.getTargetUseDistrictCodes());
 
         // MapSearchService의 findLandsByFullCodeAndFilter 활용

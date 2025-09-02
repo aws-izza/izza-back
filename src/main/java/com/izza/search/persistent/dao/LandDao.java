@@ -11,6 +11,7 @@ import com.izza.utils.ResultSetUtils;
 import com.izza.utils.SqlConditionUtils;
 import com.izza.search.presentation.dto.LongRangeDto;
 import com.izza.search.vo.Point;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Repository
+@Slf4j
 public class LandDao {
 
     private final JdbcTemplate jdbcTemplate;
@@ -98,111 +100,109 @@ public class LandDao {
     }
 
     private List<LandCountQueryResult> countLandsByRegionsWithPrefixSum(CountLandQuery query) {
-        int areaBucketMin = (int) (query.landAreaMin() / 500);
-        int areaBucketMax = (int) (query.landAreaMax() / 500);
-        int priceBucketMin = (int) (query.officialLandPriceMin() / 500000);
-        int priceBucketMax = (int) (query.officialLandPriceMax() / 500000);
+        int areaBucketMin = Math.max(0, (int) (query.landAreaMin() / 500));
+        int areaBucketMax = Math.min(1999, (int) (query.landAreaMax() / 500));
+        int priceBucketMin = Math.max(0, (int) (query.officialLandPriceMin() / 500000));
+        int priceBucketMax = Math.min(360, (int) (query.officialLandPriceMax() / 500000));
 
-        // 각 지역의 최대 버킷값 조회하여 요청된 max값이 실제 최대값을 넘으면 조정
-        for (String keyPrefix : query.fullCodePrefixes()) {
-            String maxBucketSql = """
-                SELECT MAX(area_bucket) as max_area_bucket, MAX(price_bucket) as max_price_bucket \s
-                FROM land_statistics_prefix_sum \s
-                WHERE key_prefix = ? AND use_zone_category IN (%s)
-                """;
+        Map<String, Long> regionCountMap = new HashMap<>();
+
+        // 각 지역별, 카테고리별로 개별 계산 후 합산
+        for (String regionCode : query.fullCodePrefixes()) {
+            long totalCountForRegion = 0;
             
-            String useZonePlaceholders = query.useZoneCategories().stream()
-                    .map(s -> "?")
-                    .reduce((a, b) -> a + "," + b)
-                    .orElse("");
-            
-            String finalMaxBucketSql = String.format(maxBucketSql, useZonePlaceholders);
-            
-            List<Object> maxBucketParams = new ArrayList<>();
-            maxBucketParams.add(keyPrefix);
-            maxBucketParams.addAll(query.useZoneCategories());
-            
-            Map<String, Object> maxBuckets = jdbcTemplate.queryForMap(finalMaxBucketSql, maxBucketParams.toArray());
-            Integer maxAreaBucket = (Integer) maxBuckets.get("max_area_bucket");
-            Integer maxPriceBucket = (Integer) maxBuckets.get("max_price_bucket");
-            
-            if (maxAreaBucket != null && areaBucketMax > maxAreaBucket) {
-                areaBucketMax = maxAreaBucket;
+            for (String useZoneCategory : query.useZoneCategories()) {
+                // UNION ALL로 p1, p2, p3, p4를 한번에 조회
+                StringBuilder unionSql = new StringBuilder();
+                unionSql.append("SELECT 'p1' as query_name, COALESCE(cumulative_count, 0) as count_value ")
+                        .append("FROM land_statistics_prefix_sum ")
+                        .append("WHERE key_prefix = ? AND use_zone_category = ? AND area_bucket = ? AND price_bucket = ? ");
+                
+                if (areaBucketMin > 0) {
+                    unionSql.append("UNION ALL ")
+                            .append("SELECT 'p2' as query_name, COALESCE(cumulative_count, 0) as count_value ")
+                            .append("FROM land_statistics_prefix_sum ")
+                            .append("WHERE key_prefix = ? AND use_zone_category = ? AND area_bucket = ? AND price_bucket = ? ");
+                }
+                
+                if (priceBucketMin > 0) {
+                    unionSql.append("UNION ALL ")
+                            .append("SELECT 'p3' as query_name, COALESCE(cumulative_count, 0) as count_value ")
+                            .append("FROM land_statistics_prefix_sum ")
+                            .append("WHERE key_prefix = ? AND use_zone_category = ? AND area_bucket = ? AND price_bucket = ? ");
+                }
+                
+                if (areaBucketMin > 0 && priceBucketMin > 0) {
+                    unionSql.append("UNION ALL ")
+                            .append("SELECT 'p4' as query_name, COALESCE(cumulative_count, 0) as count_value ")
+                            .append("FROM land_statistics_prefix_sum ")
+                            .append("WHERE key_prefix = ? AND use_zone_category = ? AND area_bucket = ? AND price_bucket = ? ");
+                }
+
+                List<Object> params = new ArrayList<>();
+                // p1 파라미터
+                params.add(regionCode);
+                params.add(useZoneCategory);
+                params.add(areaBucketMax);
+                params.add(priceBucketMax);
+                
+                // p2 파라미터 (areaBucketMin > 0일 때만)
+                if (areaBucketMin > 0) {
+                    params.add(regionCode);
+                    params.add(useZoneCategory);
+                    params.add(areaBucketMin - 1);
+                    params.add(priceBucketMax);
+                }
+                
+                // p3 파라미터 (priceBucketMin > 0일 때만)
+                if (priceBucketMin > 0) {
+                    params.add(regionCode);
+                    params.add(useZoneCategory);
+                    params.add(areaBucketMax);
+                    params.add(priceBucketMin - 1);
+                }
+                
+                // p4 파라미터 (둘 다 > 0일 때만)
+                if (areaBucketMin > 0 && priceBucketMin > 0) {
+                    params.add(regionCode);
+                    params.add(useZoneCategory);
+                    params.add(areaBucketMin - 1);
+                    params.add(priceBucketMin - 1);
+                }
+
+                // 쿼리 실행 및 결과 파싱
+                List<Map<String, Object>> results = jdbcTemplate.queryForList(unionSql.toString(), params.toArray());
+                
+                long p1Count = 0L, p2Count = 0L, p3Count = 0L, p4Count = 0L;
+                for (Map<String, Object> row : results) {
+                    String queryName = (String) row.get("query_name");
+                    Long countValue = ((Number) row.get("count_value")).longValue();
+                    
+                    switch (queryName) {
+                        case "p1" -> p1Count = countValue;
+                        case "p2" -> p2Count = countValue;
+                        case "p3" -> p3Count = countValue;
+                        case "p4" -> p4Count = countValue;
+                    }
+                }
+                
+                // 2D prefix sum 공식: p1 - p2 - p3 + p4
+                long categoryCount = p1Count - p2Count - p3Count + p4Count;
+                
+                log.debug("지역: {}, 카테고리: {}, p1: {}, p2: {}, p3: {}, p4: {}, 결과: {}", 
+                        regionCode, useZoneCategory, p1Count, p2Count, p3Count, p4Count, categoryCount);
+                
+                if (categoryCount > 0) {
+                    totalCountForRegion += categoryCount;
+                }
             }
-            if (maxPriceBucket != null && priceBucketMax > maxPriceBucket) {
-                priceBucketMax = maxPriceBucket;
-            }
+            
+            regionCountMap.put(regionCode, totalCountForRegion);
         }
 
-        StringBuilder sql = new StringBuilder();
-        sql.append("""
-                SELECT \s
-                    key_prefix as region_code,
-                    SUM(land_count) as land_count \s
-                FROM (
-                    SELECT \s
-                        p1.key_prefix,
-                        COALESCE(p1.cumulative_count, 0) - 
-                        COALESCE(p2.cumulative_count, 0) - 
-                        COALESCE(p3.cumulative_count, 0) + 
-                        COALESCE(p4.cumulative_count, 0) as land_count \s
-                    FROM land_statistics_prefix_sum p1
-                    LEFT JOIN land_statistics_prefix_sum p2 ON (
-                        p2.key_prefix = p1.key_prefix
-                        AND p2.use_zone_category = p1.use_zone_category
-                        AND p2.area_bucket = ? - 1 
-                        AND p2.price_bucket = ?
-                    )
-                    LEFT JOIN land_statistics_prefix_sum p3 ON (
-                        p3.key_prefix = p1.key_prefix
-                        AND p3.use_zone_category = p1.use_zone_category
-                        AND p3.area_bucket = ? 
-                        AND p3.price_bucket = ? - 1
-                    )
-                    LEFT JOIN land_statistics_prefix_sum p4 ON (
-                        p4.key_prefix = p1.key_prefix
-                        AND p4.use_zone_category = p1.use_zone_category
-                        AND p4.area_bucket = ? - 1 
-                        AND p4.price_bucket = ? - 1
-                    )
-                    WHERE p1.key_prefix IN (%s) \s
-                    AND p1.use_zone_category IN (%s) \s
-                    AND p1.area_bucket = ? \s
-                    AND p1.price_bucket = ? \s
-                ) subquery
-                GROUP BY key_prefix \s
-                """);
-
-        String keyPrefixPlaceholders = query.fullCodePrefixes().stream()
-                .map(s -> "?")
-                .reduce((a, b) -> a + "," + b)
-                .orElse("");
-        
-        String useZonePlaceholders = query.useZoneCategories().stream()
-                .map(s -> "?")
-                .reduce((a, b) -> a + "," + b)
-                .orElse("");
-
-        String finalSql = String.format(sql.toString(), keyPrefixPlaceholders, useZonePlaceholders);
-
-        List<Object> params = new ArrayList<>();
-        params.add(areaBucketMin);
-        params.add(areaBucketMax);
-        params.add(areaBucketMax);
-        params.add(priceBucketMin);
-        params.add(areaBucketMin);
-        params.add(priceBucketMin);
-        params.addAll(query.fullCodePrefixes());
-        params.addAll(query.useZoneCategories());
-        params.add(areaBucketMax);
-        params.add(priceBucketMax);
-
-
-        System.out.println(sql);
-        System.out.println(params);
-        return jdbcTemplate.query(finalSql, (rs, rowNum) -> new LandCountQueryResult(
-                rs.getString("region_code"),
-                rs.getLong("land_count")), params.toArray());
+        return regionCountMap.entrySet().stream()
+                .map(entry -> new LandCountQueryResult(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private List<LandCountQueryResult> countLandsByRegionsLegacy(CountLandQuery query) {
