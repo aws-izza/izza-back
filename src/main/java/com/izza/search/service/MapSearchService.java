@@ -35,6 +35,7 @@ import com.izza.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,17 +54,17 @@ public class MapSearchService {
 
     public List<LandGroupSearchResponse> getAllLandGroupMarkers(
             MapSearchRequest mapSearchRequest, LandSearchFilterRequest landSearchFilterRequest) {
-        
+
         if (landSearchFilterRequest.useZoneCategories() == null || landSearchFilterRequest.useZoneCategories().isEmpty()) {
             landSearchFilterRequest = new LandSearchFilterRequest(
-                landSearchFilterRequest.landAreaMin(),
-                landSearchFilterRequest.landAreaMax(),
-                landSearchFilterRequest.officialLandPriceMin(),
-                landSearchFilterRequest.officialLandPriceMax(),
-                List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
+                    landSearchFilterRequest.landAreaMin(),
+                    landSearchFilterRequest.landAreaMax(),
+                    landSearchFilterRequest.officialLandPriceMin(),
+                    landSearchFilterRequest.officialLandPriceMax(),
+                    List.of("COMMERCIAL", "INDUSTRIAL", "MANAGEMENT")
             );
         }
-        
+
         ZoomLevel zoomLevel = ZoomLevel.from(mapSearchRequest.zoomLevel());
         if (zoomLevel.equals(ZoomLevel.LAND)) {
             return getLandSearchResponses(mapSearchRequest, landSearchFilterRequest);
@@ -73,7 +74,7 @@ public class MapSearchService {
     }
 
     private List<LandGroupSearchResponse> getLandSearchResponses(MapSearchRequest mapSearchRequest,
-            LandSearchFilterRequest landSearchFilterRequest) {
+                                                                 LandSearchFilterRequest landSearchFilterRequest) {
 
         // useZoneCategories를 직접 사용 (더 이상 변환 불필요)
         LandSearchQuery query = new LandSearchQuery(
@@ -105,10 +106,14 @@ public class MapSearchService {
                 new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
                 new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat()));
 
+
         List<BeopjungDong> beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(mapSearchQuery);
 
-        // 법정동이 20개 이상이면 ZoomLevel을 한 단계 상승시켜 다시 조회
-        if (beopjeongDongs.size() >= 20) {
+        if ((mapSearchRequest.zoomLevel() == 5 || mapSearchRequest.zoomLevel() == 6)
+            && beopjeongDongs.stream().filter(b -> StringUtils.startsWithIgnoreCase(
+                b.getFullCode(), "11"
+        )).count() > 3
+        ) {
             ZoomLevel higherZoomLevel = getHigherZoomLevel(zoomLevel);
             if (higherZoomLevel != null) {
                 MapSearchQuery higherMapSearchQuery = new MapSearchQuery(
@@ -119,6 +124,18 @@ public class MapSearchService {
                 zoomLevel = higherZoomLevel;
             }
         }
+//        // 법정동이 20개 이상이면 ZoomLevel을 한 단계 상승시켜 다시 조회
+//        if (beopjeongDongs.size() >= 20) {
+//            ZoomLevel higherZoomLevel = getHigherZoomLevel(zoomLevel);
+//            if (higherZoomLevel != null) {
+//                MapSearchQuery higherMapSearchQuery = new MapSearchQuery(
+//                        higherZoomLevel,
+//                        new Point(mapSearchRequest.southWestLng(), mapSearchRequest.southWestLat()),
+//                        new Point(mapSearchRequest.northEastLng(), mapSearchRequest.northEastLat()));
+//                beopjeongDongs = beopjungDongDao.findAreasByZoomLevel(higherMapSearchQuery);
+//                zoomLevel = higherZoomLevel;
+//            }
+//        }
 
         BeopjungDongType beopjungDongType = BeopjungDongType.valueOf(zoomLevel.getType());
         List<String> fullCodePrefixes = beopjeongDongs.stream()
@@ -234,10 +251,10 @@ public class MapSearchService {
         // then extract its full_code and call getAreaDetailsByFullCode
         Land land = landOptional.get();
         String fullCode = land.getBeopjungDongCode();
-        
+
         return getAreaDetailsByFullCode(fullCode);
     }
-    
+
     public AreaDetailResponse getAreaDetailsByFullCode(String fullCode) {
         String sigCode = fullCode.substring(0, 5) + "00000";
 
@@ -265,11 +282,11 @@ public class MapSearchService {
 
         return new AreaDetailResponse(fullCode, address, costInfo, textInfo, populationInfo);
     }
-    
+
     /**
      * fullCode와 범위 조건으로 토지 목록 조회
-     * 
-     * @param fullCode 법정동 코드
+     *
+     * @param fullCode                법정동 코드
      * @param landSearchFilterRequest 토지 검색 필터 (면적, 가격, 용도지역)
      * @return 조건에 맞는 토지 목록
      */
@@ -285,7 +302,7 @@ public class MapSearchService {
                 landSearchFilterRequest.officialLandPriceMax(),
                 landSearchFilterRequest.useZoneCategories().get(0)
         );
-        
+
         return landDao.findLandsByFullCode(query);
     }
 
@@ -294,7 +311,7 @@ public class MapSearchService {
         if (landOptional.isEmpty()) {
             throw new BusinessException("주소에 해당하는 토지를 찾을 수 없습니다: " + address, HttpStatus.NOT_FOUND);
         }
-        
+
         Land land = landOptional.get();
         return new LandDetailResponse(
                 land.getId(),
